@@ -1,6 +1,7 @@
 /**
  * Captain Link — 主页逻辑
- * 预览方式：iframe 嵌入真实网页 → 失败则回退 thum.io 截图 → 最终回退 favicon
+ * 预览方案：iframe 嵌入式小窗 → 失败回退 thum.io 截图 → 最终回退 favicon
+ * 参考 D:/index.html 的最佳实践优化缩放比例和加载策略
  */
 
 (function() {
@@ -22,7 +23,6 @@
       allLinks = data.links || [];
       renderStats(allLinks);
       renderCardView(allLinks);
-      startIframeLoaders();
     } catch (err) {
       console.error('加载链接失败:', err);
       renderEmpty();
@@ -39,7 +39,6 @@
       const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
       const links = keyword ? filterLinks(keyword) : allLinks;
       renderByView(links);
-      startIframeLoaders();
     });
   });
 
@@ -78,7 +77,7 @@
     requestAnimationFrame(update);
   }
 
-  /* ==================== 卡片视图（iframe 小窗预览） ==================== */
+  /* ==================== 卡片视图（iframe 嵌入式小窗） ==================== */
   function renderCardView(links) {
     if (!links || links.length === 0) { renderEmpty(); return; }
     grid.className = 'links-grid';
@@ -87,158 +86,114 @@
       const faviconUrl = CONFIG.faviconService + encodeURIComponent(getDomain(link.url)) + '&sz=64';
       const fallbackSrc = CONFIG.previewService + encodeURIComponent(link.url);
       const isEager = index < eagerCount;
-      const delay = (index * 0.05).toFixed(2);
-
-      // 首屏 iframe 直出；其余挂 data-src 懒加载
-      const iframeSrc = isEager
-        ? `src="${escapeAttr(link.url)}"`
-        : `data-src="${escapeAttr(link.url)}"`;
+      const delay = (index * 0.04).toFixed(2);
 
       return `
         <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
            class="link-card" style="animation-delay: ${delay}s" data-fallback="${escapeAttr(fallbackSrc)}">
-          <div class="link-preview">
-            <div class="preview-frame">
-              <div class="skeleton"></div>
-              <iframe ${iframeSrc}
-                      sandbox="allow-scripts allow-same-origin allow-forms"
-                      loading="${isEager ? 'eager' : 'lazy'}"
-                      class="${isEager ? 'preview-eager' : 'lazy-iframe'}"
-                      referrerpolicy="no-referrer"
-                      title="${escapeAttr(link.title)}"></iframe>
-              <div class="preview-overlay"></div>
-            </div>
+          <div class="card-header">
+            <img src="${escapeAttr(faviconUrl)}" alt="" class="card-favicon"
+                 onerror="this.style.display='none'" loading="lazy" decoding="async">
+            <span class="card-domain">${escapeHtml(link.title)}</span>
+            ${link.category ? `<span class="card-tag">${escapeHtml(link.category)}</span>` : ''}
+          </div>
+          <div class="link-preview" data-src="${escapeAttr(link.url)}">
+            <div class="skeleton"></div>
             <div class="preview-fallback">
               <img src="${escapeAttr(faviconUrl)}" alt="" loading="lazy" decoding="async">
               <span>${escapeHtml(getDomain(link.url))}</span>
             </div>
+            <div class="preview-overlay"></div>
           </div>
-          <div class="link-info">
-            <div class="link-header">
-              <img src="${escapeAttr(faviconUrl)}" alt="" class="link-favicon"
-                   onerror="this.style.display='none'" loading="lazy" decoding="async">
-              <span class="link-title">${escapeHtml(link.title)}</span>
-            </div>
-            <p class="link-description">${escapeHtml(link.description || '')}</p>
-            <div class="link-meta">
-              <span class="link-url">${escapeHtml(getDomain(link.url))}</span>
-              ${link.category ? `<span class="link-category">${escapeHtml(link.category)}</span>` : ''}
-            </div>
+          <div class="card-footer">
+            <span class="card-url">${escapeHtml(link.url)}</span>
+            <span class="card-visit">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 9.5L9.5 2.5M9.5 2.5H5.5M9.5 2.5V6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              访问
+            </span>
           </div>
         </a>
       `;
     }).join('');
+
+    // 卡片渲染完成后，注入首屏 iframe + 监听懒加载
+    injectIframes();
   }
 
-  /* ==================== iframe 加载器 ==================== */
-  function startIframeLoaders() {
-    loadEagerIframes();
-    observeLazyIframes();
-  }
+  /* ==================== iframe 注入策略 ==================== */
+  function injectIframes() {
+    const previews = grid.querySelectorAll('.link-preview[data-src]');
+    const isLazySupported = 'loading' in HTMLIFrameElement.prototype;
 
-  /* 首屏 iframe 直接加载 + 超时回退 */
-  function loadEagerIframes() {
-    grid.querySelectorAll('iframe.preview-eager').forEach(setupIframeTimeout);
-  }
+    previews.forEach(function(el) {
+      const src = el.getAttribute('data-src');
+      if (!src) return;
+      el.removeAttribute('data-src');
 
-  function setupIframeTimeout(iframe) {
-    const card = iframe.closest('.link-card');
-    const fallbackSrc = card ? card.dataset.fallback : '';
-    let resolved = false;
+      const iframe = document.createElement('iframe');
+      iframe.src = src;
+      iframe.sandbox = 'allow-scripts allow-same-origin';
+      iframe.referrerPolicy = 'no-referrer';
+      iframe.title = '';
 
-    const resolvePreview = function(success) {
-      if (resolved) return;
-      resolved = true;
-
-      const skeleton = iframe.parentElement.querySelector('.skeleton');
-      if (skeleton) skeleton.style.display = 'none';
-
-      if (success) {
-        iframe.style.display = 'block';
+      // 首屏 eager；其余 native lazy（无需 IntersectionObserver）
+      const isEager = Array.from(previews).indexOf(el) < eagerCount;
+      if (isLazySupported && !isEager) {
+        iframe.loading = 'lazy';
       } else {
-        // iframe 加载失败 → 用 thum.io 截图回退
-        iframe.style.display = 'none';
-        if (fallbackSrc) {
-          showImageFallback(iframe.parentElement, fallbackSrc);
-        } else {
-          showFaviconFallback(card);
-        }
+        iframe.loading = 'eager';
       }
-    };
 
-    iframe.addEventListener('load', function() {
-      // load 事件触发 = iframe 成功加载（未被 X-Frame-Options 阻止）
-      resolvePreview(true);
-    });
-
-    // 超时 3 秒未加载完成 → 视为失败
-    setTimeout(function() {
-      if (!resolved) {
-        // 检查 iframe 是否有内容（跨域无法访问 contentDocument，用 try-catch）
-        try {
-          const doc = iframe.contentDocument;
-          if (doc && doc.body && doc.body.innerHTML.trim()) {
-            resolvePreview(true);
-            return;
-          }
-        } catch (e) {
-          // 跨域，无法判断，假设成功
-          resolvePreview(true);
-          return;
-        }
-        resolvePreview(false);
+      // 插入到 preview-overlay 之前
+      const overlay = el.querySelector('.preview-overlay');
+      if (overlay) {
+        el.insertBefore(iframe, overlay);
+      } else {
+        el.appendChild(iframe);
       }
-    }, 3000);
-  }
 
-  /* 懒加载：IntersectionObserver + 进入视口后再加载 iframe */
-  function observeLazyIframes() {
-    if (!window.IntersectionObserver) return;
-
-    const observer = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (!entry.isIntersecting) return;
-        const iframe = entry.target;
-        const src = iframe.getAttribute('data-src');
-        if (!src) return;
-
-        iframe.src = src;
-        iframe.removeAttribute('data-src');
-        setupIframeTimeout(iframe);
-        observer.unobserve(iframe);
+      // iframe 加载完成 → 隐藏骨架
+      iframe.addEventListener('load', function() {
+        const skeleton = el.querySelector('.skeleton');
+        if (skeleton) skeleton.style.display = 'none';
+        iframe.classList.add('loaded');
       });
-    }, { rootMargin: '600px', threshold: 0.01 });
 
-    grid.querySelectorAll('iframe.lazy-iframe').forEach(function(iframe) {
-      observer.observe(iframe);
+      // 5 秒超时 → 用截图回退
+      const fallbackSrc = el.closest('.link-card')
+        ? el.closest('.link-card').dataset.fallback : '';
+      setTimeout(function() {
+        if (!iframe.classList.contains('loaded') && fallbackSrc) {
+          iframe.remove();
+          showImageFallback(el, fallbackSrc);
+        }
+      }, 5000);
     });
   }
 
-  /* 截图回退：用 <img> 替换 iframe */
-  function showImageFallback(frame, src) {
+  /* 截图回退：创建 <img> 替换失败 iframe */
+  function showImageFallback(preview, src) {
+    const skeleton = preview.querySelector('.skeleton');
+    if (skeleton) skeleton.style.display = 'none';
+
     const img = document.createElement('img');
     img.src = src;
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.style.cssText = 'display:block; width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;';
     img.alt = '';
-
+    img.className = 'fallback-img';
     img.onerror = function() {
       img.remove();
-      // 截图也失败 → favicon
-      const card = frame.closest('.link-card');
-      if (card) showFaviconFallback(card);
+      const fallback = preview.querySelector('.preview-fallback');
+      if (fallback) fallback.style.display = 'flex';
     };
 
-    frame.appendChild(img);
-  }
-
-  function showFaviconFallback(card) {
-    if (!card) return;
-    const fallback = card.querySelector('.preview-fallback');
-    if (fallback) fallback.style.display = 'flex';
-    const skeleton = card.querySelector('.skeleton');
-    if (skeleton) skeleton.style.display = 'none';
+    const overlay = preview.querySelector('.preview-overlay');
+    if (overlay) {
+      preview.insertBefore(img, overlay);
+    } else {
+      preview.appendChild(img);
+    }
   }
 
   /* ==================== 列表视图 ==================== */
@@ -280,7 +235,6 @@
   function handleSearch(e) {
     const keyword = e.target.value.trim().toLowerCase();
     renderByView(keyword ? filterLinks(keyword) : allLinks);
-    startIframeLoaders();
   }
 
   function filterLinks(keyword) {

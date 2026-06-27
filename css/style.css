@@ -494,57 +494,71 @@ input, textarea { font-family: inherit; outline: none; }
 }
 
 .link-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-4px);
   background: var(--card-hover-bg);
   border-color: var(--card-hover-border);
   box-shadow: 0 16px 48px rgba(0, 212, 255, 0.08);
 }
 
-/* --- 预览截图区域 --- */
-.link-preview {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background: linear-gradient(135deg, #0d1f3c, #0a1628);
-  overflow: hidden;
-  position: relative;
+/* --- 卡片顶部栏（favicon + 标题 + 标签）--- */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--card-border);
+}
+.card-favicon {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.card-domain {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: rgba(0, 212, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
 }
 
 /* --- iframe 预览小窗 --- */
-.preview-frame {
+.link-preview {
+  position: relative;
   width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0; left: 0;
+  height: 200px;
   overflow: hidden;
-  z-index: 1;
+  background: #0a1628;
+  border-bottom: 1px solid var(--card-border);
 }
 
-.preview-frame iframe {
-  width: 400%;
-  height: 400%;
+/* 与 D:/index.html 对齐：160% 尺寸 × scale(0.625) = 100% 可视 */
+.link-preview iframe {
+  width: 160%;
+  height: 160%;
   border: none;
-  transform: scale(0.25);
+  transform: scale(0.625);
   transform-origin: 0 0;
   position: absolute;
   top: 0; left: 0;
-  display: none;
+  pointer-events: none;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
-
-/* 首屏 iframe：立即可见 */
-.preview-eager {
-  display: block !important;
-  animation: preview-fade-in 0.6s ease-out;
-}
-
-/* 懒加载 iframe：初始隐藏，加载完成后 block */
-.lazy-iframe {
-  display: none;
-}
-
-@keyframes preview-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+.link-preview iframe.loaded {
+  opacity: 1;
 }
 
 /* 透明点击遮罩：确保点击穿透到父 <a> */
@@ -552,17 +566,48 @@ input, textarea { font-family: inherit; outline: none; }
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: transparent;
+  cursor: pointer;
 }
 
-/* 回退截图图片 */
-.preview-frame img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+/* 回退：thum.io 截图 */
+.link-preview img.fallback-img {
   position: absolute;
   top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
   z-index: 1;
+}
+
+/* --- 卡片底部栏（URL + 访问按钮）--- */
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+}
+.card-url {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+.card-visit {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(0, 212, 255, 0.1);
+  transition: background 0.15s;
+}
+.card-visit:hover {
+  background: rgba(0, 212, 255, 0.18);
 }
 
 /* 预览加载骨架 */
@@ -600,79 +645,6 @@ input, textarea { font-family: inherit; outline: none; }
 .link-preview .preview-fallback span {
   font-size: 13px;
   color: var(--text-muted);
-}
-
-/* --- 卡片信息区域 --- */
-.link-info {
-  padding: 20px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.link-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.link-favicon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-
-.link-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.3;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.link-description {
-  font-size: 14px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 12px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.link-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255,255,255,0.05);
-}
-
-.link-url {
-  font-size: 12px;
-  color: var(--accent);
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 200px;
-}
-
-.link-category {
-  font-size: 11px;
-  padding: 4px 10px;
-  background: rgba(0, 212, 255, 0.1);
-  color: var(--accent);
-  border-radius: 20px;
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 /* --- 空状态 --- */

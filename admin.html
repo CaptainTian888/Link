@@ -61,18 +61,18 @@
     <!-- 部署状态 -->
     <div class="deploy-status" id="deployStatus"></div>
 
-    <!-- 添加/编辑链接表单 -->
+    <!-- 添加新链接表单 -->
     <div class="section-card">
-      <h3 id="addLinkTitle">添加新链接</h3>
+      <h3>添加新链接</h3>
       <form id="linkForm" onsubmit="handleLinkSubmit(event)">
         <div class="form-row">
           <div class="form-field">
             <label>链接标题 *</label>
-            <input type="text" id="linkTitle" placeholder="例如：GitHub" required>
+            <input type="text" id="linkTitle" placeholder="例如：GitHub" required autocomplete="off">
           </div>
           <div class="form-field">
             <label>链接 URL *</label>
-            <input type="text" id="linkUrl" placeholder="例如：https://github.com" required>
+            <input type="text" id="linkUrl" placeholder="例如：https://github.com" required autocomplete="off">
           </div>
         </div>
         <div class="form-row">
@@ -84,11 +84,10 @@
         <div class="form-row">
           <div class="form-field">
             <label>分类标签</label>
-            <input type="text" id="linkCat" placeholder="例如：开发工具">
+            <input type="text" id="linkCat" placeholder="例如：开发工具" autocomplete="off">
           </div>
           <div class="form-field" style="justify-content:flex-end;">
-            <button type="button" class="btn btn-secondary" onclick="cancelEdit()" id="cancelBtn" style="display:none;">取消编辑</button>
-            <button type="submit" class="btn btn-primary" style="width:auto;">添加 / 保存</button>
+            <button type="submit" class="btn btn-primary" style="width:auto;">添加链接</button>
           </div>
         </div>
       </form>
@@ -152,6 +151,42 @@
       </button>
     </div>
 
+  </div>
+
+  <!-- 编辑链接弹窗 -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>编辑链接</h3>
+        <button class="modal-close" onclick="closeEditModal()">
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label>链接标题 *</label>
+          <input type="text" id="editTitle" required autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label>链接 URL *</label>
+          <input type="text" id="editUrl" required autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label>描述</label>
+          <textarea id="editDesc" rows="2"></textarea>
+        </div>
+        <div class="form-field">
+          <label>分类标签</label>
+          <input type="text" id="editCat" autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeEditModal()" style="flex:1;">取消</button>
+        <button class="btn btn-primary" onclick="handleEditSubmit()" style="flex:1;">保存修改</button>
+      </div>
+    </div>
   </div>
 
   <!-- Scripts -->

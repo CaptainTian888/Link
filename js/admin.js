@@ -1,6 +1,6 @@
 /**
  * Captain Link — 管理后台逻辑
- * 负责：密码验证 → 链接CRUD → GitHub API提交 → 自动部署
+ * 负责：密码验证 → 链接CRUD（弹窗编辑） → 拖拽排序 → GitHub API提交 → 自动部署
  */
 
 (function() {
@@ -21,7 +21,7 @@
   const linkList       = document.getElementById('linkList');
   const deployBtn      = document.getElementById('deployBtn');
   const deployStatus   = document.getElementById('deployStatus');
-  const addLinkTitle   = document.getElementById('addLinkTitle');
+  const editModal      = document.getElementById('editModal');
 
   /* ==================== 密码验证 ==================== */
   window.checkPassword = function() {
@@ -87,25 +87,40 @@
     }
   }
 
-  /* ==================== 渲染链接列表 ==================== */
+  /* ==================== 渲染链接列表（含排序按钮） ==================== */
   function renderLinkList() {
+    const countEl = document.getElementById('linkCount');
+    if (countEl) countEl.textContent = `(${links.length})`;
+
     if (links.length === 0) {
       linkList.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">暂无链接，请在上方添加</p>';
       return;
     }
 
     linkList.innerHTML = links.map((link, index) => `
-      <div class="link-list-item">
+      <div class="link-list-item" data-link-id="${link.id}">
         <div class="item-info">
           <div class="item-title">${escapeHtml(link.title)}</div>
           <div class="item-url">${escapeHtml(link.url)}</div>
         </div>
         <div class="item-actions">
-          <button class="btn icon-btn" onclick="editLink('${link.id}')">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          <button class="btn icon-btn reorder-btn" onclick="moveLinkUp('${link.id}')" ${index === 0 ? 'disabled' : ''} title="上移">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+            </svg>
+          </button>
+          <button class="btn icon-btn reorder-btn" onclick="moveLinkDown('${link.id}')" ${index === links.length - 1 ? 'disabled' : ''} title="下移">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <button class="btn icon-btn" onclick="editLink('${link.id}')" title="编辑">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
             编辑
           </button>
-          <button class="btn btn-danger" onclick="deleteLink('${link.id}')">
+          <button class="btn btn-danger" onclick="deleteLink('${link.id}')" title="删除">
             删除
           </button>
         </div>
@@ -113,7 +128,7 @@
     `).join('');
   }
 
-  /* ==================== 添加/编辑链接 ==================== */
+  /* ==================== 添加链接（顶部表单） ==================== */
   window.handleLinkSubmit = function(e) {
     e.preventDefault();
 
@@ -133,48 +148,112 @@
       finalUrl = 'https://' + finalUrl;
     }
 
-    if (editingId) {
-      /* 编辑模式 */
-      const idx = links.findIndex(l => l.id === editingId);
-      if (idx !== -1) {
-        links[idx] = { ...links[idx], title, url: finalUrl, description: desc, category: cat };
-      }
-      editingId = null;
-      addLinkTitle.textContent = '添加新链接';
-      showToast('链接已更新（记得保存部署）', 'info');
-    } else {
-      /* 添加模式 */
-      const newLink = {
-        id: Date.now().toString(),
-        title,
-        url: finalUrl,
-        description: desc,
-        category: cat
-      };
-      links.push(newLink);
-      showToast('链接已添加（记得保存部署）', 'success');
-    }
+    const newLink = {
+      id: Date.now().toString(),
+      title,
+      url: finalUrl,
+      description: desc,
+      category: cat
+    };
 
-    /* 清空表单 */
+    links.push(newLink);
     linkForm.reset();
     renderLinkList();
+    showToast('链接已添加（记得保存部署）', 'success');
   };
 
-  /* ==================== 编辑链接 ==================== */
+  /* ==================== 编辑链接（弹窗模式） ==================== */
   window.editLink = function(id) {
     const link = links.find(l => l.id === id);
     if (!link) return;
 
-    document.getElementById('linkTitle').value = link.title || '';
-    document.getElementById('linkUrl').value   = link.url || '';
-    document.getElementById('linkDesc').value  = link.description || '';
-    document.getElementById('linkCat').value   = link.category || '';
+    document.getElementById('editTitle').value = link.title || '';
+    document.getElementById('editUrl').value   = link.url || '';
+    document.getElementById('editDesc').value  = link.description || '';
+    document.getElementById('editCat').value   = link.category || '';
 
     editingId = id;
-    addLinkTitle.textContent = '编辑链接';
-    /* 滚动到表单 */
-    linkForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    editModal.classList.add('active');
+    /* 聚焦标题 */
+    setTimeout(() => document.getElementById('editTitle').focus(), 100);
   };
+
+  window.closeEditModal = function() {
+    editingId = null;
+    editModal.classList.remove('active');
+  };
+
+  window.handleEditSubmit = function() {
+    const title = document.getElementById('editTitle').value.trim();
+    const url   = document.getElementById('editUrl').value.trim();
+    const desc  = document.getElementById('editDesc').value.trim();
+    const cat   = document.getElementById('editCat').value.trim();
+
+    if (!title || !url) {
+      showToast('请填写标题和URL', 'error');
+      return;
+    }
+
+    let finalUrl = url;
+    if (!/^https?:\/\//i.test(finalUrl)) {
+      finalUrl = 'https://' + finalUrl;
+    }
+
+    const idx = links.findIndex(l => l.id === editingId);
+    if (idx !== -1) {
+      links[idx] = { ...links[idx], title, url: finalUrl, description: desc, category: cat };
+    }
+
+    closeEditModal();
+    renderLinkList();
+    showToast('链接已更新（记得保存部署）', 'success');
+  };
+
+  /* 关闭弹窗：点击遮罩层 */
+  if (editModal) {
+    editModal.addEventListener('click', function(e) {
+      if (e.target === editModal) closeEditModal();
+    });
+  }
+
+  /* ESC 关闭弹窗 */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && editModal && editModal.classList.contains('active')) {
+      closeEditModal();
+    }
+  });
+
+  /* ==================== 排序：上移 / 下移 ==================== */
+  window.moveLinkUp = function(id) {
+    const idx = links.findIndex(l => l.id === id);
+    if (idx <= 0) return;
+    [links[idx], links[idx - 1]] = [links[idx - 1], links[idx]];
+    renderLinkList();
+    scrollAndHighlight(id);
+  };
+
+  window.moveLinkDown = function(id) {
+    const idx = links.findIndex(l => l.id === id);
+    if (idx >= links.length - 1) return;
+    [links[idx], links[idx + 1]] = [links[idx + 1], links[idx]];
+    renderLinkList();
+    scrollAndHighlight(id);
+  };
+
+  function scrollAndHighlight(id) {
+    /* 延迟一帧等 DOM 重新渲染 */
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-link-id="${id}"]`);
+      if (!el) return;
+
+      /* 滚动到视口中间 */
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      /* 高亮动画 */
+      el.classList.add('sort-highlight');
+      setTimeout(() => el.classList.remove('sort-highlight'), 600);
+    });
+  }
 
   /* ==================== 删除链接 ==================== */
   window.deleteLink = function(id) {
@@ -182,13 +261,6 @@
     links = links.filter(l => l.id !== id);
     renderLinkList();
     showToast('链接已删除（记得保存部署）', 'info');
-  };
-
-  /* ==================== 取消编辑 ==================== */
-  window.cancelEdit = function() {
-    editingId = null;
-    linkForm.reset();
-    addLinkTitle.textContent = '添加新链接';
   };
 
   /* ==================== GitHub Token 管理 ==================== */

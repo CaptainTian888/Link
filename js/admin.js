@@ -9,7 +9,7 @@
   /* ==================== 状态管理 ==================== */
   let links = [];
   let editingId = null;
-  let ghToken = sessionStorage.getItem('captain_link_token') || '';
+  let ghToken = localStorage.getItem('captain_link_token') || '';
 
   /* ==================== DOM 元素 ==================== */
   const passwordGate   = document.getElementById('passwordGate');
@@ -199,14 +199,14 @@
       return;
     }
     ghToken = token;
-    sessionStorage.setItem('captain_link_token', token);
+    localStorage.setItem('captain_link_token', token);
     updateTokenStatus(true);
     showToast('Token 已保存', 'success');
   };
 
   window.clearToken = function() {
     ghToken = '';
-    sessionStorage.removeItem('captain_link_token');
+    localStorage.removeItem('captain_link_token');
     tokenInput.value = '';
     updateTokenStatus(false);
     showToast('Token 已清除', 'info');

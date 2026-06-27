@@ -1,6 +1,6 @@
 /**
  * Captain Link — 主页逻辑
- * 负责：加载链接数据 → 渲染卡片 / 列表 → 首屏直出 + 懒加载 → 搜索过滤 → 视图切换
+ * 预览方式：iframe 嵌入真实网页 → 失败则回退 thum.io 截图 → 最终回退 favicon
  */
 
 (function() {
@@ -11,6 +11,7 @@
   const grid = document.getElementById('linksGrid');
   const searchInput = document.getElementById('searchInput');
   const toggleBtns = document.querySelectorAll('.toggle-btn');
+  const eagerCount = CONFIG.eagerCount || 6;
 
   /* ==================== 初始化 ==================== */
   async function init() {
@@ -21,7 +22,7 @@
       allLinks = data.links || [];
       renderStats(allLinks);
       renderCardView(allLinks);
-      observePreviews();
+      startIframeLoaders();
     } catch (err) {
       console.error('加载链接失败:', err);
       renderEmpty();
@@ -38,7 +39,7 @@
       const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
       const links = keyword ? filterLinks(keyword) : allLinks;
       renderByView(links);
-      observePreviews();
+      startIframeLoaders();
     });
   });
 
@@ -50,25 +51,15 @@
     }
   }
 
-  /* ==================== 渲染域名统计 ==================== */
+  /* ==================== 域名统计 ==================== */
   function renderStats(links) {
-    let firstLevel = 0;
-    let secondLevel = 0;
-
+    let firstLevel = 0, secondLevel = 0;
     links.forEach(link => {
       try {
-        const hostname = new URL(link.url).hostname;
-        const parts = hostname.split('.');
-        if (parts.length <= 2) {
-          firstLevel++;
-        } else {
-          secondLevel++;
-        }
-      } catch {
-        firstLevel++;
-      }
+        const parts = new URL(link.url).hostname.split('.');
+        parts.length <= 2 ? firstLevel++ : secondLevel++;
+      } catch { firstLevel++; }
     });
-
     animateCounter('statTotal', links.length);
     animateCounter('statFirst', firstLevel);
     animateCounter('statSecond', secondLevel);
@@ -77,58 +68,46 @@
   function animateCounter(id, target) {
     const el = document.getElementById(id);
     if (!el) return;
-    const start = 0;
-    const duration = 800;
-    const startTime = performance.now();
-
+    const duration = 800, startTime = performance.now();
     function update(now) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(start + (target - start) * eased);
-      el.textContent = current;
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      } else {
-        el.textContent = target;
-        el.classList.add('counted');
-        setTimeout(() => el.classList.remove('counted'), 500);
-      }
+      const p = Math.min((now - startTime) / duration, 1);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) return requestAnimationFrame(update);
+      el.textContent = target;
     }
     requestAnimationFrame(update);
   }
 
-  /* ==================== 卡片视图 ==================== */
+  /* ==================== 卡片视图（iframe 小窗预览） ==================== */
   function renderCardView(links) {
-    if (!links || links.length === 0) {
-      renderEmpty();
-      return;
-    }
-
+    if (!links || links.length === 0) { renderEmpty(); return; }
     grid.className = 'links-grid';
-    const eagerCount = CONFIG.eagerCount || 6;
 
     grid.innerHTML = links.map((link, index) => {
-      const faviconUrl = CONFIG.faviconService + getDomain(link.url) + '&sz=64';
-      const previewSrc = CONFIG.previewService + encodeURIComponent(link.url);
+      const faviconUrl = CONFIG.faviconService + encodeURIComponent(getDomain(link.url)) + '&sz=64';
+      const fallbackSrc = CONFIG.previewService + encodeURIComponent(link.url);
+      const isEager = index < eagerCount;
       const delay = (index * 0.05).toFixed(2);
 
-      // 首屏卡片：直接 src + fetchpriority=high + decoding=async，不设 skeleton
-      const isEager = index < eagerCount;
+      // 首屏 iframe 直出；其余挂 data-src 懒加载
+      const iframeSrc = isEager
+        ? `src="${escapeAttr(link.url)}"`
+        : `data-src="${escapeAttr(link.url)}"`;
 
       return `
         <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
-           class="link-card" style="animation-delay: ${delay}s">
+           class="link-card" style="animation-delay: ${delay}s" data-fallback="${escapeAttr(fallbackSrc)}">
           <div class="link-preview">
-            ${isEager ? '' : '<div class="skeleton"></div>'}
-            <img ${isEager
-              ? `src="${escapeAttr(previewSrc)}" loading="eager" fetchpriority="high"`
-              : `data-src="${escapeAttr(previewSrc)}" loading="lazy"`
-            }
-                 decoding="async"
-                 alt="${escapeAttr(link.title)}"
-                 class="${isEager ? 'preview-eager' : 'lazy-preview'}"
-                 onerror="handlePreviewError(this, '${escapeAttr(link.url)}')">
+            <div class="preview-frame">
+              <div class="skeleton"></div>
+              <iframe ${iframeSrc}
+                      sandbox="allow-scripts allow-same-origin allow-forms"
+                      loading="${isEager ? 'eager' : 'lazy'}"
+                      class="${isEager ? 'preview-eager' : 'lazy-iframe'}"
+                      referrerpolicy="no-referrer"
+                      title="${escapeAttr(link.title)}"></iframe>
+              <div class="preview-overlay"></div>
+            </div>
             <div class="preview-fallback">
               <img src="${escapeAttr(faviconUrl)}" alt="" loading="lazy" decoding="async">
               <span>${escapeHtml(getDomain(link.url))}</span>
@@ -151,131 +130,157 @@
     }).join('');
   }
 
-  /* ==================== 列表视图（按域名级别分组） ==================== */
-  function renderListView(links) {
-    if (!links || links.length === 0) {
-      renderEmpty();
-      return;
-    }
+  /* ==================== iframe 加载器 ==================== */
+  function startIframeLoaders() {
+    loadEagerIframes();
+    observeLazyIframes();
+  }
 
-    const firstLevel = [];
-    const secondLevel = [];
+  /* 首屏 iframe 直接加载 + 超时回退 */
+  function loadEagerIframes() {
+    grid.querySelectorAll('iframe.preview-eager').forEach(setupIframeTimeout);
+  }
 
-    links.forEach(link => {
-      try {
-        const hostname = new URL(link.url).hostname;
-        const parts = hostname.split('.');
-        if (parts.length <= 2) {
-          firstLevel.push(link);
+  function setupIframeTimeout(iframe) {
+    const card = iframe.closest('.link-card');
+    const fallbackSrc = card ? card.dataset.fallback : '';
+    let resolved = false;
+
+    const resolvePreview = function(success) {
+      if (resolved) return;
+      resolved = true;
+
+      const skeleton = iframe.parentElement.querySelector('.skeleton');
+      if (skeleton) skeleton.style.display = 'none';
+
+      if (success) {
+        iframe.style.display = 'block';
+      } else {
+        // iframe 加载失败 → 用 thum.io 截图回退
+        iframe.style.display = 'none';
+        if (fallbackSrc) {
+          showImageFallback(iframe.parentElement, fallbackSrc);
         } else {
-          secondLevel.push(link);
+          showFaviconFallback(card);
         }
-      } catch {
-        firstLevel.push(link);
       }
+    };
+
+    iframe.addEventListener('load', function() {
+      // load 事件触发 = iframe 成功加载（未被 X-Frame-Options 阻止）
+      resolvePreview(true);
     });
 
+    // 超时 3 秒未加载完成 → 视为失败
+    setTimeout(function() {
+      if (!resolved) {
+        // 检查 iframe 是否有内容（跨域无法访问 contentDocument，用 try-catch）
+        try {
+          const doc = iframe.contentDocument;
+          if (doc && doc.body && doc.body.innerHTML.trim()) {
+            resolvePreview(true);
+            return;
+          }
+        } catch (e) {
+          // 跨域，无法判断，假设成功
+          resolvePreview(true);
+          return;
+        }
+        resolvePreview(false);
+      }
+    }, 3000);
+  }
+
+  /* 懒加载：IntersectionObserver + 进入视口后再加载 iframe */
+  function observeLazyIframes() {
+    if (!window.IntersectionObserver) return;
+
+    const observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        const iframe = entry.target;
+        const src = iframe.getAttribute('data-src');
+        if (!src) return;
+
+        iframe.src = src;
+        iframe.removeAttribute('data-src');
+        setupIframeTimeout(iframe);
+        observer.unobserve(iframe);
+      });
+    }, { rootMargin: '600px', threshold: 0.01 });
+
+    grid.querySelectorAll('iframe.lazy-iframe').forEach(function(iframe) {
+      observer.observe(iframe);
+    });
+  }
+
+  /* 截图回退：用 <img> 替换 iframe */
+  function showImageFallback(frame, src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.style.cssText = 'display:block; width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;';
+    img.alt = '';
+
+    img.onerror = function() {
+      img.remove();
+      // 截图也失败 → favicon
+      const card = frame.closest('.link-card');
+      if (card) showFaviconFallback(card);
+    };
+
+    frame.appendChild(img);
+  }
+
+  function showFaviconFallback(card) {
+    if (!card) return;
+    const fallback = card.querySelector('.preview-fallback');
+    if (fallback) fallback.style.display = 'flex';
+    const skeleton = card.querySelector('.skeleton');
+    if (skeleton) skeleton.style.display = 'none';
+  }
+
+  /* ==================== 列表视图 ==================== */
+  function renderListView(links) {
+    if (!links || links.length === 0) { renderEmpty(); return; }
+    const firstLevel = [], secondLevel = [];
+    links.forEach(link => {
+      try {
+        new URL(link.url).hostname.split('.').length <= 2
+          ? firstLevel.push(link) : secondLevel.push(link);
+      } catch { firstLevel.push(link); }
+    });
     grid.className = 'links-list-view';
-    grid.innerHTML = [
-      buildListSection('一级域名', firstLevel),
-      buildListSection('二级域名', secondLevel)
-    ].join('');
+    grid.innerHTML = [buildListSection('一级域名', firstLevel), buildListSection('二级域名', secondLevel)].join('');
   }
 
   function buildListSection(title, links) {
     if (links.length === 0) return '';
-
-    const items = links.map((link, i) => {
-      const faviconUrl = CONFIG.faviconService + getDomain(link.url) + '&sz=64';
-      return `
-        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
-           class="list-link-item" style="animation-delay: ${(i * 0.03).toFixed(2)}s">
-          <img src="${escapeAttr(faviconUrl)}" alt="" class="list-favicon"
-               onerror="this.style.display='none'" loading="lazy" decoding="async">
-          <div class="list-info">
-            <div class="list-title">${escapeHtml(link.title)}</div>
-            <div class="list-url">${escapeHtml(getDomain(link.url))}</div>
-          </div>
-          <span class="list-arrow">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"/>
-            </svg>
-          </span>
-        </a>
-      `;
-    }).join('');
-
     return `
       <div class="list-section">
         <h3>${escapeHtml(title)} <span class="section-count">${links.length}</span></h3>
-        ${items}
-      </div>
-    `;
+        ${links.map((link, i) => {
+          const faviconUrl = CONFIG.faviconService + encodeURIComponent(getDomain(link.url)) + '&sz=64';
+          return `
+            <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
+               class="list-link-item" style="animation-delay: ${(i * 0.03).toFixed(2)}s">
+              <img src="${escapeAttr(faviconUrl)}" alt="" class="list-favicon" onerror="this.style.display='none'" loading="lazy" decoding="async">
+              <div class="list-info">
+                <div class="list-title">${escapeHtml(link.title)}</div>
+                <div class="list-url">${escapeHtml(getDomain(link.url))}</div>
+              </div>
+              <span class="list-arrow"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"/></svg></span>
+            </a>`;
+        }).join('')}
+      </div>`;
   }
 
-  /* ==================== IntersectionObserver 懒加载（仅对非首屏卡片） ==================== */
-  function observePreviews() {
-    if (!window.IntersectionObserver) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        const img = entry.target;
-        const src = img.getAttribute('data-src');
-        if (!src) return;
-
-        img.src = src;
-        img.classList.add('loaded');
-        img.onload = function() {
-          const skeleton = img.parentElement.querySelector('.skeleton');
-          if (skeleton) skeleton.style.display = 'none';
-          img.style.display = 'block';
-        };
-
-        observer.unobserve(img);
-      });
-    }, {
-      rootMargin: '600px',  // 提前 600px 加载，确保滚动到之前已就绪
-      threshold: 0.01
-    });
-
-    grid.querySelectorAll('img.lazy-preview').forEach(img => {
-      observer.observe(img);
-    });
-  }
-
-  /* ==================== 预览图加载失败回退 ==================== */
-  window.handlePreviewError = function(img, url) {
-    const parent = img.parentElement;
-    if (!parent) return;
-    const skeleton = parent.querySelector('.skeleton');
-    if (skeleton) skeleton.style.display = 'none';
-    img.style.display = 'none';
-    const fallback = parent.querySelector('.preview-fallback');
-    if (fallback) fallback.style.display = 'flex';
-  };
-
-  /* ==================== 空状态 ==================== */
-  function renderEmpty() {
-    grid.className = 'links-grid';
-    grid.innerHTML = `
-      <div class="empty-state">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-        </svg>
-        <h3>暂无链接</h3>
-        <p>点击右上角「管理」进入后台添加你的第一个链接</p>
-      </div>
-    `;
-  }
-
-  /* ==================== 搜索过滤 ==================== */
+  /* ==================== 搜索 ==================== */
   function handleSearch(e) {
     const keyword = e.target.value.trim().toLowerCase();
-    const links = keyword ? filterLinks(keyword) : allLinks;
-    renderByView(links);
-    observePreviews();
+    renderByView(keyword ? filterLinks(keyword) : allLinks);
+    startIframeLoaders();
   }
 
   function filterLinks(keyword) {
@@ -289,11 +294,8 @@
 
   /* ==================== 工具函数 ==================== */
   function getDomain(url) {
-    try {
-      return new URL(url).hostname.replace('www.', '');
-    } catch {
-      return url;
-    }
+    try { return new URL(url).hostname.replace('www.', ''); }
+    catch { return url; }
   }
 
   function escapeHtml(str) {
@@ -306,9 +308,18 @@
     return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /* ==================== 启动 ==================== */
-  if (searchInput) {
-    searchInput.addEventListener('input', handleSearch);
+  /* ==================== 空状态 ==================== */
+  function renderEmpty() {
+    grid.className = 'links-grid';
+    grid.innerHTML = `
+      <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        <h3>暂无链接</h3>
+        <p>点击右上角「管理」进入后台添加你的第一个链接</p>
+      </div>`;
   }
+
+  /* ==================== 启动 ==================== */
+  if (searchInput) searchInput.addEventListener('input', handleSearch);
   document.addEventListener('DOMContentLoaded', init);
 })();

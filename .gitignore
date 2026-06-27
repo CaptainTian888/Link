@@ -1,0 +1,6 @@
+# WorkBuddy project data (not needed in deployment)
+.workbuddy/
+
+# System files
+.DS_Store
+Thumbs.db

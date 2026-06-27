@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Captain Link — 个人链接收纳站</title>
+  <meta name="description" content="一站式管理 & 展示你的所有链接">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="https://imagehub.tianzeqi.dev/file/favicon/1766540939004_14.png">
+  <link rel="apple-touch-icon" href="https://imagehub.tianzeqi.dev/file/favicon/1766540939004_14.png">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Captain Link">
+  <meta property="og:description" content="一站式管理 & 展示你的所有链接">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://imagehub.tianzeqi.dev/file/favicon/1766540939004_14.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 动画背景 -->
+  <div class="animated-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- 顶部导航 -->
+  <nav class="navbar">
+    <a href="index.html" class="logo">
+      <img src="https://imagehub.tianzeqi.dev/file/favicon/1766540939004_14.png" alt="Captain Link">
+      <span class="logo-text">Captain Link</span>
+    </a>
+    <a href="admin.html" class="admin-link">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      管理
+    </a>
+  </nav>
+
+  <!-- Hero 区域 -->
+  <section class="hero">
+    <h1>Captain <span class="gradient-text">Link</span></h1>
+    <p class="tagline">一站式管理 & 展示你的所有链接</p>
+  </section>
+
+  <!-- 搜索栏 -->
+  <div class="search-bar">
+    <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input type="text" id="searchInput" placeholder="搜索链接...">
+  </div>
+
+  <!-- 链接卡片网格 -->
+  <section class="links-section">
+    <div class="links-grid" id="linksGrid">
+      <!-- 由 main.js 动态渲染 -->
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Captain Link · Powered by
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a> &
+      <a href="https://cloudflare.com" target="_blank" rel="noopener">Cloudflare</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script src="js/config.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -517,6 +517,18 @@ input, textarea { font-family: inherit; outline: none; }
   transition: transform 0.4s ease;
 }
 
+/* 首屏直出图片：立即可见，不从骨架开始 */
+.preview-eager {
+  display: block;
+  animation: preview-fade-in 0.4s ease-out;
+}
+
+@keyframes preview-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 懒加载图片：初始隐藏，加载完成后 block */
 .lazy-preview {
   display: none;
 }

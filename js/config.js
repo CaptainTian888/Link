@@ -29,7 +29,10 @@ const CONFIG = {
   /* ==================== 预览截图服务 ==================== */
   /* 使用 thum.io 免费服务获取网站截图                              */
   /* 格式: 前缀 + 目标URL                                          */
-  previewService: 'https://image.thum.io/get/width/800/crop/500/noanimate/',
+  // 400px 宽度即可填满卡片（~340px × retina），体积减半、渲染更快
+  previewService: 'https://image.thum.io/get/width/400/crop/500/noanimate/',
+  // 首屏直出数量：这些卡片不走懒加载，直接出图
+  eagerCount: 6,
   faviconService: 'https://www.google.com/s2/favicons?domain=',
 
   /* ==================== 部署等待时间（毫秒） ==================== */

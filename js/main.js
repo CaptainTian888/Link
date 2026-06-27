@@ -1,6 +1,6 @@
 /**
  * Captain Link — 主页逻辑
- * 负责：加载链接数据 → 渲染卡片 / 列表 → 预览懒加载 → 搜索过滤 → 视图切换
+ * 负责：加载链接数据 → 渲染卡片 / 列表 → 首屏直出 + 懒加载 → 搜索过滤 → 视图切换
  */
 
 (function() {
@@ -98,7 +98,7 @@
     requestAnimationFrame(update);
   }
 
-  /* ==================== 卡片视图（原网格布局） ==================== */
+  /* ==================== 卡片视图 ==================== */
   function renderCardView(links) {
     if (!links || links.length === 0) {
       renderEmpty();
@@ -106,27 +106,38 @@
     }
 
     grid.className = 'links-grid';
+    const eagerCount = CONFIG.eagerCount || 6;
+
     grid.innerHTML = links.map((link, index) => {
       const faviconUrl = CONFIG.faviconService + getDomain(link.url) + '&sz=64';
+      const previewSrc = CONFIG.previewService + encodeURIComponent(link.url);
       const delay = (index * 0.05).toFixed(2);
 
+      // 首屏卡片：直接 src + fetchpriority=high + decoding=async，不设 skeleton
+      const isEager = index < eagerCount;
+
       return `
-        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="link-card" style="animation-delay: ${delay}s">
+        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
+           class="link-card" style="animation-delay: ${delay}s">
           <div class="link-preview">
-            <div class="skeleton"></div>
-            <img data-src="${escapeAttr(CONFIG.previewService + encodeURIComponent(link.url))}"
+            ${isEager ? '' : '<div class="skeleton"></div>'}
+            <img ${isEager
+              ? `src="${escapeAttr(previewSrc)}" loading="eager" fetchpriority="high"`
+              : `data-src="${escapeAttr(previewSrc)}" loading="lazy"`
+            }
+                 decoding="async"
                  alt="${escapeAttr(link.title)}"
-                 class="lazy-preview"
+                 class="${isEager ? 'preview-eager' : 'lazy-preview'}"
                  onerror="handlePreviewError(this, '${escapeAttr(link.url)}')">
             <div class="preview-fallback">
-              <img src="${escapeAttr(faviconUrl)}" alt="">
+              <img src="${escapeAttr(faviconUrl)}" alt="" loading="lazy" decoding="async">
               <span>${escapeHtml(getDomain(link.url))}</span>
             </div>
           </div>
           <div class="link-info">
             <div class="link-header">
               <img src="${escapeAttr(faviconUrl)}" alt="" class="link-favicon"
-                   onerror="this.style.display='none'">
+                   onerror="this.style.display='none'" loading="lazy" decoding="async">
               <span class="link-title">${escapeHtml(link.title)}</span>
             </div>
             <p class="link-description">${escapeHtml(link.description || '')}</p>
@@ -180,7 +191,7 @@
         <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
            class="list-link-item" style="animation-delay: ${(i * 0.03).toFixed(2)}s">
           <img src="${escapeAttr(faviconUrl)}" alt="" class="list-favicon"
-               onerror="this.style.display='none'">
+               onerror="this.style.display='none'" loading="lazy" decoding="async">
           <div class="list-info">
             <div class="list-title">${escapeHtml(link.title)}</div>
             <div class="list-url">${escapeHtml(getDomain(link.url))}</div>
@@ -202,7 +213,7 @@
     `;
   }
 
-  /* ==================== IntersectionObserver 懒加载预览图 ==================== */
+  /* ==================== IntersectionObserver 懒加载（仅对非首屏卡片） ==================== */
   function observePreviews() {
     if (!window.IntersectionObserver) return;
 
@@ -224,7 +235,7 @@
         observer.unobserve(img);
       });
     }, {
-      rootMargin: '200px',  // 提前 200px 开始加载
+      rootMargin: '600px',  // 提前 600px 加载，确保滚动到之前已就绪
       threshold: 0.01
     });
 
@@ -235,10 +246,12 @@
 
   /* ==================== 预览图加载失败回退 ==================== */
   window.handlePreviewError = function(img, url) {
-    const skeleton = img.parentElement.querySelector('.skeleton');
+    const parent = img.parentElement;
+    if (!parent) return;
+    const skeleton = parent.querySelector('.skeleton');
     if (skeleton) skeleton.style.display = 'none';
     img.style.display = 'none';
-    const fallback = img.parentElement.querySelector('.preview-fallback');
+    const fallback = parent.querySelector('.preview-fallback');
     if (fallback) fallback.style.display = 'flex';
   };
 

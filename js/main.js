@@ -1,7 +1,6 @@
 /**
  * Captain Link — 主页逻辑
- * 预览方案：iframe 嵌入式小窗 → 失败回退 thum.io 截图 → 最终回退 favicon
- * 参考 D:/index.html 的最佳实践优化缩放比例和加载策略
+ * 预览方案：纯 iframe 嵌入式小窗，无回退，加载中显示骨架屏
  */
 
 (function() {
@@ -84,13 +83,11 @@
 
     grid.innerHTML = links.map((link, index) => {
       const faviconUrl = CONFIG.faviconService + encodeURIComponent(getDomain(link.url)) + '&sz=64';
-      const fallbackSrc = CONFIG.previewService + encodeURIComponent(link.url);
-      const isEager = index < eagerCount;
       const delay = (index * 0.04).toFixed(2);
 
       return `
         <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
-           class="link-card" style="animation-delay: ${delay}s" data-fallback="${escapeAttr(fallbackSrc)}">
+           class="link-card" style="animation-delay: ${delay}s">
           <div class="card-header">
             <img src="${escapeAttr(faviconUrl)}" alt="" class="card-favicon"
                  onerror="this.style.display='none'" loading="lazy" decoding="async">
@@ -99,10 +96,6 @@
           </div>
           <div class="link-preview" data-src="${escapeAttr(link.url)}">
             <div class="skeleton"></div>
-            <div class="preview-fallback">
-              <img src="${escapeAttr(faviconUrl)}" alt="" loading="lazy" decoding="async">
-              <span>${escapeHtml(getDomain(link.url))}</span>
-            </div>
             <div class="preview-overlay"></div>
           </div>
           <div class="card-footer">
@@ -158,42 +151,7 @@
         if (skeleton) skeleton.style.display = 'none';
         iframe.classList.add('loaded');
       });
-
-      // 5 秒超时 → 用截图回退
-      const fallbackSrc = el.closest('.link-card')
-        ? el.closest('.link-card').dataset.fallback : '';
-      setTimeout(function() {
-        if (!iframe.classList.contains('loaded') && fallbackSrc) {
-          iframe.remove();
-          showImageFallback(el, fallbackSrc);
-        }
-      }, 5000);
     });
-  }
-
-  /* 截图回退：创建 <img> 替换失败 iframe */
-  function showImageFallback(preview, src) {
-    const skeleton = preview.querySelector('.skeleton');
-    if (skeleton) skeleton.style.display = 'none';
-
-    const img = document.createElement('img');
-    img.src = src;
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.alt = '';
-    img.className = 'fallback-img';
-    img.onerror = function() {
-      img.remove();
-      const fallback = preview.querySelector('.preview-fallback');
-      if (fallback) fallback.style.display = 'flex';
-    };
-
-    const overlay = preview.querySelector('.preview-overlay');
-    if (overlay) {
-      preview.insertBefore(img, overlay);
-    } else {
-      preview.appendChild(img);
-    }
   }
 
   /* ==================== 列表视图 ==================== */

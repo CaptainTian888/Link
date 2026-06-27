@@ -569,15 +569,6 @@ input, textarea { font-family: inherit; outline: none; }
   cursor: pointer;
 }
 
-/* 回退：thum.io 截图 */
-.link-preview img.fallback-img {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  z-index: 1;
-}
-
 /* --- 卡片底部栏（URL + 访问按钮）--- */
 .card-footer {
   display: flex;
@@ -622,29 +613,6 @@ input, textarea { font-family: inherit; outline: none; }
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
-}
-
-/* 预览加载失败时的回退 */
-.link-preview .preview-fallback {
-  display: none;
-  width: 100%;
-  height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: linear-gradient(135deg, #0d1f3c, #0a1628);
-}
-
-.link-preview .preview-fallback img {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-}
-
-.link-preview .preview-fallback span {
-  font-size: 13px;
-  color: var(--text-muted);
 }
 
 /* --- 空状态 --- */

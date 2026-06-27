@@ -1,13 +1,6 @@
 {
   "links": [
     {
-      "id": "main-01",
-      "title": "20021128.xyz",
-      "url": "https://20021128.xyz",
-      "description": "个人主站",
-      "category": "主域名"
-    },
-    {
       "id": "main-02",
       "title": "akasolv.com",
       "url": "https://akasolv.com",
@@ -102,70 +95,77 @@
       "id": "main-15",
       "title": "stablegold.cc",
       "url": "https://stablegold.cc",
-      "description": "StableGold 品牌站",
+      "description": "StableGold",
       "category": "主域名"
     },
     {
       "id": "main-16",
       "title": "tianzeqi.cc",
       "url": "https://tianzeqi.cc",
-      "description": "天择齐 CC 域名",
+      "description": "田泽琦CC",
       "category": "主域名"
     },
     {
       "id": "main-17",
       "title": "tianzeqi.cn",
       "url": "https://tianzeqi.cn",
-      "description": "天择齐 CN 域名",
+      "description": "田泽琦 CN",
       "category": "主域名"
     },
     {
       "id": "main-18",
       "title": "tianzeqi.com",
       "url": "https://tianzeqi.com",
-      "description": "天择齐 COM 主站",
+      "description": "田泽琦COM",
       "category": "主域名"
     },
     {
       "id": "main-19",
       "title": "tianzeqi.link",
       "url": "https://tianzeqi.link",
-      "description": "天择齐 LINK 域名",
+      "description": "田泽琦LINK",
       "category": "主域名"
     },
     {
       "id": "main-20",
       "title": "tianzeqi.net",
       "url": "https://tianzeqi.net",
-      "description": "天择齐 NET 域名",
+      "description": "田泽琦NET",
       "category": "主域名"
     },
     {
       "id": "main-21",
       "title": "tianzeqi.top",
       "url": "https://tianzeqi.top",
-      "description": "天择齐 TOP 域名",
+      "description": "田泽琦TOP",
       "category": "主域名"
     },
     {
       "id": "main-22",
       "title": "tianzeqi.xyz",
       "url": "https://tianzeqi.xyz",
-      "description": "天择齐 XYZ 域名",
+      "description": "田泽琦XYZ",
       "category": "主域名"
     },
     {
       "id": "main-23",
       "title": "wenlian.trade",
       "url": "https://wenlian.trade",
-      "description": "Wenlian Trade 品牌站",
+      "description": "Wenlian Trade",
       "category": "主域名"
     },
     {
       "id": "main-24",
       "title": "zerohub.ai",
       "url": "https://zerohub.ai",
-      "description": "ZeroHub AI 主站",
+      "description": "ZeroHub AI",
+      "category": "主域名"
+    },
+    {
+      "id": "main-01",
+      "title": "20021128.xyz",
+      "url": "https://20021128.xyz",
+      "description": "个人主站",
       "category": "主域名"
     },
     {

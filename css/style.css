@@ -460,6 +460,41 @@ input, textarea { font-family: inherit; outline: none; }
   pointer-events: none;
 }
 
+/* ==================== 链接卡片网格（带分类） ==================== */
+.links-grid-categorized {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  animation: card-fade-in 0.4s ease-out;
+}
+
+.card-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-section-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.card-section-title .section-count {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+  background: var(--card-bg);
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+}
+
 /* ==================== 链接卡片网格 ==================== */
 .links-section {
   max-width: 1200px;

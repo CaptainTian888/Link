@@ -76,41 +76,60 @@
     requestAnimationFrame(update);
   }
 
-  /* ==================== 卡片视图（iframe 嵌入式小窗） ==================== */
+  /* ==================== 卡片视图（iframe 嵌入式小窗，按域名分级） ==================== */
   function renderCardView(links) {
     if (!links || links.length === 0) { renderEmpty(); return; }
-    grid.className = 'links-grid';
 
-    grid.innerHTML = links.map((link, index) => {
-      const faviconUrl = CONFIG.faviconService + encodeURIComponent(getDomain(link.url)) + '&sz=64';
-      const delay = (index * 0.04).toFixed(2);
+    const firstLevel = [], secondLevel = [];
+    links.forEach(link => {
+      try {
+        new URL(link.url).hostname.split('.').length <= 2
+          ? firstLevel.push(link) : secondLevel.push(link);
+      } catch { firstLevel.push(link); }
+    });
 
-      return `
-        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
-           class="link-card" style="animation-delay: ${delay}s">
-          <div class="card-header">
-            <img src="${escapeAttr(faviconUrl)}" alt="" class="card-favicon"
-                 onerror="this.style.display='none'" loading="lazy" decoding="async">
-            <span class="card-domain">${escapeHtml(link.title)}</span>
-            ${link.category ? `<span class="card-tag">${escapeHtml(link.category)}</span>` : ''}
-          </div>
-          <div class="link-preview" data-src="${escapeAttr(link.url)}">
-            <div class="skeleton"></div>
-            <div class="preview-overlay"></div>
-          </div>
-          <div class="card-footer">
-            <span class="card-url">${escapeHtml(link.url)}</span>
-            <span class="card-visit">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 9.5L9.5 2.5M9.5 2.5H5.5M9.5 2.5V6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              访问
-            </span>
-          </div>
-        </a>
-      `;
-    }).join('');
+    grid.className = 'links-grid-categorized';
+    grid.innerHTML = [
+      buildCardSection('一级域名', firstLevel),
+      buildCardSection('二级域名', secondLevel)
+    ].filter(Boolean).join('');
 
-    // 卡片渲染完成后，注入首屏 iframe + 监听懒加载
     injectIframes();
+  }
+
+  function buildCardSection(title, links) {
+    if (links.length === 0) return '';
+    return `
+      <div class="card-section">
+        <h3 class="card-section-title">${escapeHtml(title)} <span class="section-count">${links.length}</span></h3>
+        <div class="links-grid">
+          ${links.map((link, index) => {
+            const faviconUrl = CONFIG.faviconService + encodeURIComponent(getDomain(link.url)) + '&sz=64';
+            const delay = (index * 0.04).toFixed(2);
+            return `
+              <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
+                 class="link-card" style="animation-delay: ${delay}s">
+                <div class="card-header">
+                  <img src="${escapeAttr(faviconUrl)}" alt="" class="card-favicon"
+                       onerror="this.style.display='none'" loading="lazy" decoding="async">
+                  <span class="card-domain">${escapeHtml(link.title)}</span>
+                  ${link.category ? `<span class="card-tag">${escapeHtml(link.category)}</span>` : ''}
+                </div>
+                <div class="link-preview" data-src="${escapeAttr(link.url)}">
+                  <div class="skeleton"></div>
+                  <div class="preview-overlay"></div>
+                </div>
+                <div class="card-footer">
+                  <span class="card-url">${escapeHtml(link.url)}</span>
+                  <span class="card-visit">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 9.5L9.5 2.5M9.5 2.5H5.5M9.5 2.5V6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    访问
+                  </span>
+                </div>
+              </a>`;
+          }).join('')}
+        </div>
+      </div>`;
   }
 
   /* ==================== iframe 注入策略 ==================== */

@@ -17,11 +17,63 @@
       if (!res.ok) throw new Error('Failed to load links.json');
       const data = await res.json();
       allLinks = data.links || [];
+      renderStats(allLinks);
       renderLinks(allLinks);
     } catch (err) {
       console.error('加载链接失败:', err);
       renderEmpty();
     }
+  }
+
+  /* ==================== 渲染域名统计 ==================== */
+  function renderStats(links) {
+    let firstLevel = 0;
+    let secondLevel = 0;
+
+    links.forEach(link => {
+      try {
+        const hostname = new URL(link.url).hostname;
+        const parts = hostname.split('.');
+        // parts: e.g. ["example", "com"] = 一级域名 (2 parts)
+        //        e.g. ["sub", "tianzeqi", "dev"] = 二级域名 (3 parts)
+        if (parts.length <= 2) {
+          firstLevel++;
+        } else {
+          secondLevel++;
+        }
+      } catch {
+        firstLevel++;
+      }
+    });
+
+    animateCounter('statTotal', links.length);
+    animateCounter('statFirst', firstLevel);
+    animateCounter('statSecond', secondLevel);
+  }
+
+  function animateCounter(id, target) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const start = 0;
+    const duration = 800;
+    const startTime = performance.now();
+
+    function update(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(start + (target - start) * eased);
+      el.textContent = current;
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      } else {
+        el.textContent = target;
+        el.classList.add('counted');
+        setTimeout(() => el.classList.remove('counted'), 500);
+      }
+    }
+    requestAnimationFrame(update);
   }
 
   /* ==================== 渲染链接卡片 ==================== */

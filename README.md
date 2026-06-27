@@ -75,7 +75,7 @@ GITHUB_CONFIG: {
 ### 进入后台
 
 1. 打开网站首页，点击右上角 **「管理」** 按钮
-2. 输入管理密码：`Shinevista888@`
+2. 输入管理密码（在 `js/config.js` 中配置）
 3. 进入管理面板
 
 ### 配置 GitHub Token（首次使用）
@@ -88,7 +88,7 @@ GITHUB_CONFIG: {
 4. 生成并复制 Token（格式形如 `ghp_xxxxxxxx...`）
 5. 在管理后台的「GitHub 部署设置」区域粘贴 Token，点击「保存 Token」
 
-> Token 仅存储在浏览器 `sessionStorage` 中，关闭浏览器后自动清除，不会泄露。
+> Token 存储在浏览器 `localStorage` 中，一次保存后自动生效，关闭浏览器不会丢失。
 
 ### 添加/编辑/删除链接
 
@@ -109,7 +109,7 @@ GITHUB_CONFIG: {
 ## 安全说明
 
 - 管理密码存储在前端 `config.js` 中，理论上可通过查看源码获取。这是一个**静态网站**的固有限制，适合个人使用。如需更高安全性，建议搭配 CloudFlare Access 使用。
-- GitHub Token 仅存储在浏览器 `sessionStorage`，不会持久化。
+- GitHub Token 存储在浏览器 `localStorage` 中，持久化保存。
 - 建议将 `admin.html` 加入 `robots.txt` 避免搜索引擎收录。
 
 ## 自定义

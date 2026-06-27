@@ -260,6 +260,166 @@ input, textarea { font-family: inherit; outline: none; }
   100% { transform: scale(1); }
 }
 
+/* ==================== 视图切换按钮 ==================== */
+.view-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 auto 36px;
+  padding: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  width: fit-content;
+}
+
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.toggle-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.toggle-btn:hover {
+  color: var(--text-secondary);
+  background: var(--card-hover-bg);
+}
+
+.toggle-btn.active {
+  background: var(--accent-gradient);
+  color: #001824;
+}
+
+.toggle-btn.active svg {
+  stroke: #001824;
+}
+
+/* ==================== 列表视图 ==================== */
+.links-list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+  animation: card-fade-in 0.4s ease-out;
+}
+
+.list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.list-section h3 {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.list-section h3 .section-count {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+  background: var(--card-bg);
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+}
+
+.list-link-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: transparent;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: var(--transition);
+  animation: card-fade-in 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.list-link-item:last-child {
+  border-bottom: none;
+}
+
+.list-link-item:hover {
+  background: var(--card-hover-bg);
+  border-radius: var(--radius-sm);
+}
+
+.list-link-item .list-favicon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.list-link-item .list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-link-item .list-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+.list-link-item .list-url {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-link-item .list-arrow {
+  color: var(--text-muted);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.list-link-item:hover .list-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--accent);
+}
+
+.list-link-item .list-arrow svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ==================== 搜索栏 ==================== */
 .search-bar {
   max-width: 600px;
@@ -355,6 +515,10 @@ input, textarea { font-family: inherit; outline: none; }
   height: 100%;
   object-fit: cover;
   transition: transform 0.4s ease;
+}
+
+.lazy-preview {
+  display: none;
 }
 
 .link-card:hover .link-preview img {
@@ -965,6 +1129,15 @@ input, textarea { font-family: inherit; outline: none; }
   .links-grid {
     grid-template-columns: 1fr;
     gap: 16px;
+  }
+
+  .links-list-view {
+    padding: 0 16px 60px;
+    gap: 36px;
+  }
+
+  .list-link-item {
+    padding: 14px 16px;
   }
 
   .form-row { grid-template-columns: 1fr; }

@@ -1,14 +1,16 @@
 /**
  * Captain Link — 主页逻辑
- * 负责：加载链接数据 → 渲染卡片 → 预览截图 → 搜索过滤
+ * 负责：加载链接数据 → 渲染卡片 / 列表 → 预览懒加载 → 搜索过滤 → 视图切换
  */
 
 (function() {
   'use strict';
 
   let allLinks = [];
+  let currentView = 'card';
   const grid = document.getElementById('linksGrid');
   const searchInput = document.getElementById('searchInput');
+  const toggleBtns = document.querySelectorAll('.toggle-btn');
 
   /* ==================== 初始化 ==================== */
   async function init() {
@@ -18,10 +20,33 @@
       const data = await res.json();
       allLinks = data.links || [];
       renderStats(allLinks);
-      renderLinks(allLinks);
+      renderCardView(allLinks);
+      observePreviews();
     } catch (err) {
       console.error('加载链接失败:', err);
       renderEmpty();
+    }
+  }
+
+  /* ==================== 视图切换 ==================== */
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (currentView === this.dataset.view) return;
+      toggleBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentView = this.dataset.view;
+      const keyword = searchInput ? searchInput.value.trim().toLowerCase() : '';
+      const links = keyword ? filterLinks(keyword) : allLinks;
+      renderByView(links);
+      observePreviews();
+    });
+  });
+
+  function renderByView(links) {
+    if (currentView === 'list') {
+      renderListView(links);
+    } else {
+      renderCardView(links);
     }
   }
 
@@ -34,8 +59,6 @@
       try {
         const hostname = new URL(link.url).hostname;
         const parts = hostname.split('.');
-        // parts: e.g. ["example", "com"] = 一级域名 (2 parts)
-        //        e.g. ["sub", "tianzeqi", "dev"] = 二级域名 (3 parts)
         if (parts.length <= 2) {
           firstLevel++;
         } else {
@@ -61,7 +84,6 @@
     function update(now) {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // easeOutCubic
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = Math.round(start + (target - start) * eased);
       el.textContent = current;
@@ -76,26 +98,26 @@
     requestAnimationFrame(update);
   }
 
-  /* ==================== 渲染链接卡片 ==================== */
-  function renderLinks(links) {
+  /* ==================== 卡片视图（原网格布局） ==================== */
+  function renderCardView(links) {
     if (!links || links.length === 0) {
       renderEmpty();
       return;
     }
 
+    grid.className = 'links-grid';
     grid.innerHTML = links.map((link, index) => {
-      const previewUrl = CONFIG.previewService + encodeURIComponent(link.url);
       const faviconUrl = CONFIG.faviconService + getDomain(link.url) + '&sz=64';
-      const delay = (index * 0.08).toFixed(2);
+      const delay = (index * 0.05).toFixed(2);
 
       return `
         <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="link-card" style="animation-delay: ${delay}s">
           <div class="link-preview">
             <div class="skeleton"></div>
-            <img src="${escapeAttr(previewUrl)}" alt="${escapeAttr(link.title)}" loading="lazy"
-                 onload="this.previousElementSibling.style.display='none'; this.style.display='block';"
-                 onerror="handlePreviewError(this, '${escapeAttr(link.url)}')"
-                 style="display:none;">
+            <img data-src="${escapeAttr(CONFIG.previewService + encodeURIComponent(link.url))}"
+                 alt="${escapeAttr(link.title)}"
+                 class="lazy-preview"
+                 onerror="handlePreviewError(this, '${escapeAttr(link.url)}')">
             <div class="preview-fallback">
               <img src="${escapeAttr(faviconUrl)}" alt="">
               <span>${escapeHtml(getDomain(link.url))}</span>
@@ -118,9 +140,102 @@
     }).join('');
   }
 
+  /* ==================== 列表视图（按域名级别分组） ==================== */
+  function renderListView(links) {
+    if (!links || links.length === 0) {
+      renderEmpty();
+      return;
+    }
+
+    const firstLevel = [];
+    const secondLevel = [];
+
+    links.forEach(link => {
+      try {
+        const hostname = new URL(link.url).hostname;
+        const parts = hostname.split('.');
+        if (parts.length <= 2) {
+          firstLevel.push(link);
+        } else {
+          secondLevel.push(link);
+        }
+      } catch {
+        firstLevel.push(link);
+      }
+    });
+
+    grid.className = 'links-list-view';
+    grid.innerHTML = [
+      buildListSection('一级域名', firstLevel),
+      buildListSection('二级域名', secondLevel)
+    ].join('');
+  }
+
+  function buildListSection(title, links) {
+    if (links.length === 0) return '';
+
+    const items = links.map((link, i) => {
+      const faviconUrl = CONFIG.faviconService + getDomain(link.url) + '&sz=64';
+      return `
+        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"
+           class="list-link-item" style="animation-delay: ${(i * 0.03).toFixed(2)}s">
+          <img src="${escapeAttr(faviconUrl)}" alt="" class="list-favicon"
+               onerror="this.style.display='none'">
+          <div class="list-info">
+            <div class="list-title">${escapeHtml(link.title)}</div>
+            <div class="list-url">${escapeHtml(getDomain(link.url))}</div>
+          </div>
+          <span class="list-arrow">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"/>
+            </svg>
+          </span>
+        </a>
+      `;
+    }).join('');
+
+    return `
+      <div class="list-section">
+        <h3>${escapeHtml(title)} <span class="section-count">${links.length}</span></h3>
+        ${items}
+      </div>
+    `;
+  }
+
+  /* ==================== IntersectionObserver 懒加载预览图 ==================== */
+  function observePreviews() {
+    if (!window.IntersectionObserver) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const img = entry.target;
+        const src = img.getAttribute('data-src');
+        if (!src) return;
+
+        img.src = src;
+        img.classList.add('loaded');
+        img.onload = function() {
+          const skeleton = img.parentElement.querySelector('.skeleton');
+          if (skeleton) skeleton.style.display = 'none';
+          img.style.display = 'block';
+        };
+
+        observer.unobserve(img);
+      });
+    }, {
+      rootMargin: '200px',  // 提前 200px 开始加载
+      threshold: 0.01
+    });
+
+    grid.querySelectorAll('img.lazy-preview').forEach(img => {
+      observer.observe(img);
+    });
+  }
+
   /* ==================== 预览图加载失败回退 ==================== */
   window.handlePreviewError = function(img, url) {
-    const skeleton = img.previousElementSibling;
+    const skeleton = img.parentElement.querySelector('.skeleton');
     if (skeleton) skeleton.style.display = 'none';
     img.style.display = 'none';
     const fallback = img.parentElement.querySelector('.preview-fallback');
@@ -129,6 +244,7 @@
 
   /* ==================== 空状态 ==================== */
   function renderEmpty() {
+    grid.className = 'links-grid';
     grid.innerHTML = `
       <div class="empty-state">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,17 +260,18 @@
   /* ==================== 搜索过滤 ==================== */
   function handleSearch(e) {
     const keyword = e.target.value.trim().toLowerCase();
-    if (!keyword) {
-      renderLinks(allLinks);
-      return;
-    }
-    const filtered = allLinks.filter(link =>
+    const links = keyword ? filterLinks(keyword) : allLinks;
+    renderByView(links);
+    observePreviews();
+  }
+
+  function filterLinks(keyword) {
+    return allLinks.filter(link =>
       (link.title || '').toLowerCase().includes(keyword) ||
       (link.description || '').toLowerCase().includes(keyword) ||
       (link.url || '').toLowerCase().includes(keyword) ||
       (link.category || '').toLowerCase().includes(keyword)
     );
-    renderLinks(filtered);
   }
 
   /* ==================== 工具函数 ==================== */

@@ -258,6 +258,20 @@
       "url": "https://api.zerohub.ai",
       "description": "API 接口服务",
       "category": "zerohub.ai 产品"
+    },
+    {
+      "id": "1782730815285",
+      "title": "稳链投资控股",
+      "url": "https://stablechain.capital/",
+      "description": "稳链",
+      "category": ""
+    },
+    {
+      "id": "1782730854710",
+      "title": "田泽琦win",
+      "url": "https://tianzeqi.win/",
+      "description": "田泽琦",
+      "category": ""
     }
   ]
 }

@@ -1,13 +1,6 @@
 {
   "links": [
     {
-      "id": "main-02",
-      "title": "akasolv.com",
-      "url": "https://akasolv.com",
-      "description": "AkaSolv",
-      "category": "主域名"
-    },
-    {
       "id": "main-03",
       "title": "captain.bz",
       "url": "https://captain.bz",
@@ -19,13 +12,6 @@
       "title": "captain.ninja",
       "url": "https://captain.ninja",
       "description": "Captain Ninja",
-      "category": "主域名"
-    },
-    {
-      "id": "main-05",
-      "title": "clipperbloc.com",
-      "url": "https://clipperbloc.com",
-      "description": "ClipperBloc",
       "category": "主域名"
     },
     {

@@ -9,14 +9,13 @@
   /* ==================== 状态管理 ==================== */
   let links = [];
   let editingId = null;
-  let ghToken = localStorage.getItem('captain_link_token') || '';
+  const ghToken = CONFIG.GITHUB_CONFIG.token || '';
 
   /* ==================== DOM 元素 ==================== */
   const passwordGate   = document.getElementById('passwordGate');
   const adminPanel     = document.getElementById('adminPanel');
   const passwordInput  = document.getElementById('passwordInput');
   const passwordError  = document.getElementById('passwordError');
-  const tokenInput     = document.getElementById('tokenInput');
   const linkForm       = document.getElementById('linkForm');
   const linkList       = document.getElementById('linkList');
   const deployBtn      = document.getElementById('deployBtn');
@@ -63,13 +62,6 @@
   /* ==================== 管理后台初始化 ==================== */
   async function initAdmin() {
     await loadLinks();
-
-    /* 如果已有 token，显示连接状态 */
-    if (ghToken) {
-      tokenInput.value = ghToken;
-      updateTokenStatus(true);
-    }
-
     renderLinkList();
   }
 
@@ -263,50 +255,10 @@
     showToast('链接已删除（记得保存部署）', 'info');
   };
 
-  /* ==================== GitHub Token 管理 ==================== */
-  window.saveToken = function() {
-    const token = tokenInput.value.trim();
-    if (!token) {
-      showToast('请输入 GitHub Token', 'error');
-      return;
-    }
-    ghToken = token;
-    localStorage.setItem('captain_link_token', token);
-    updateTokenStatus(true);
-    showToast('Token 已保存', 'success');
-  };
-
-  window.clearToken = function() {
-    ghToken = '';
-    localStorage.removeItem('captain_link_token');
-    tokenInput.value = '';
-    updateTokenStatus(false);
-    showToast('Token 已清除', 'info');
-  };
-
-  function updateTokenStatus(connected) {
-    const status = document.getElementById('tokenStatus');
-    if (connected) {
-      status.className = 'token-status connected';
-      status.innerHTML = '● 已连接';
-    } else {
-      status.className = 'token-status disconnected';
-      status.innerHTML = '● 未连接';
-    }
-  }
-
   /* ==================== 保存并部署 ==================== */
   window.saveAndDeploy = async function() {
-    /* 验证 token */
     if (!ghToken) {
-      showToast('请先输入并保存 GitHub Token', 'error');
-      tokenInput.focus();
-      return;
-    }
-
-    /* 验证仓库配置 */
-    if (CONFIG.GITHUB_CONFIG.owner === 'YOUR_GITHUB_USERNAME') {
-      showToast('请先在 js/config.js 中配置 GitHub 仓库信息', 'error');
+      showToast('部署凭证未配置', 'error');
       return;
     }
 

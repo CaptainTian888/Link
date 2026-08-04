@@ -226,10 +226,10 @@
     },
     {
       "id": "sub-11",
-      "title": "seller.zerohub.ai",
-      "url": "https://amz.zerohub.ai",
-      "description": "Amazon 相关服务",
-      "category": "zerohub.ai 产品"
+      "title": "n8n.ninja.bi/",
+      "url": "https://n8n.ninja.bi/",
+      "description": "n8n",
+      "category": ""
     },
     {
       "id": "sub-12",
@@ -257,6 +257,13 @@
       "title": "tianzeqi.win",
       "url": "https://tianzeqi.win/",
       "description": "田泽琦Win",
+      "category": ""
+    },
+    {
+      "id": "1785830534906",
+      "title": "nav.tianzeqi.dev",
+      "url": "https://nav.tianzeqi.dev",
+      "description": "导航",
       "category": ""
     }
   ]

@@ -117,7 +117,7 @@ function rootDomainOf(hostname) {
 /* ==================== /api/subdomains ==================== */
 
 /**
- * 从证书透明度日志（crt.sh）反查某个一级域名签发过的子域名。
+ * 从证书透明度日志反查某个一级域名签发过的子域名（certSpotter 为主，crt.sh 兜底）。
  *
  * 这是公开接口，所以只接受 links.json 里已经出现过的一级域名 ——
  * 否则就成了任何人都能拿来扫描任意域名的开放代理。
@@ -144,6 +144,7 @@ async function handleSubdomains(request, env, ctx) {
 
     let rawNames = null;
     let usedSource = null;
+    let rateLimited = false;
     const failures = [];
 
     for (const source of CT_SOURCES) {
@@ -152,7 +153,11 @@ async function handleSubdomains(request, env, ctx) {
                 headers: { 'User-Agent': 'captain-link', 'Accept': 'application/json' },
                 signal: AbortSignal.timeout(CT_TIMEOUT_MS)
             });
-            if (!resp.ok) { failures.push(`${source.name} 返回 ${resp.status}`); continue; }
+            if (!resp.ok) {
+                if (resp.status === 429) rateLimited = true;
+                failures.push(`${source.name} 返回 ${resp.status}`);
+                continue;
+            }
 
             const entries = await resp.json();
             if (!Array.isArray(entries)) { failures.push(`${source.name} 返回了非预期格式`); continue; }
@@ -167,7 +172,12 @@ async function handleSubdomains(request, env, ctx) {
         }
     }
 
-    if (!usedSource) return json({ error: `证书日志查询失败（${failures.join('；')}）` }, 502);
+    if (!usedSource) {
+        /* 这段文案会直接显示在公开主页上，限流是常态，不要甩状态码给访客 */
+        return rateLimited
+            ? json({ error: '证书日志查询过于频繁，请稍后再试' }, 429)
+            : json({ error: '证书日志暂时不可用，请稍后再试' }, 502);
+    }
 
     /* 统一清洗：去掉 *. 通配符前缀、只保留本域下的合法主机名 */
     const names = new Set();

@@ -9,7 +9,38 @@
   /* ==================== 状态管理 ==================== */
   let links = [];
   let editingId = null;
-  const ghToken = CONFIG.GITHUB_CONFIG.token || '';
+  let authToken = '';   // 由管理密码派生，登录成功后保留在内存中供部署使用
+
+  /* ==================== 鉴权令牌派生 ==================== */
+  /* 密码经 PBKDF2 派生成 auth token；服务端只保存它的 SHA-256，
+     既反推不出密码，环境变量泄漏也换不出可用的令牌。 */
+  const AUTH_SALT = 'link-admin-auth-v1';
+
+  async function deriveAuth(password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: new TextEncoder().encode(AUTH_SALT), iterations: 200000, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    );
+    return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * 首次配置 / 改密码时用：在浏览器控制台执行
+   *   await printAdminAuthHash('你的新密码')
+   * 把打印出的哈希填进 Cloudflare 的 ADMIN_AUTH_HASH 环境变量。
+   */
+  window.printAdminAuthHash = async function(password) {
+    if (!password) return '用法：await printAdminAuthHash(\'你的新密码\')';
+    const auth = await deriveAuth(password);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(auth));
+    const hash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+    console.log('ADMIN_AUTH_HASH =', hash);
+    return hash;
+  };
 
   /* ==================== DOM 元素 ==================== */
   const passwordGate   = document.getElementById('passwordGate');
@@ -23,21 +54,48 @@
   const editModal      = document.getElementById('editModal');
 
   /* ==================== 密码验证 ==================== */
-  window.checkPassword = function() {
+  let checkingPassword = false;
+
+  window.checkPassword = async function() {
+    if (checkingPassword) return;
     const input = passwordInput.value;
-    if (input === CONFIG.adminPassword) {
+    if (!input) return rejectPassword('请输入密码');
+
+    checkingPassword = true;
+    passwordError.style.display = 'none';
+
+    try {
+      /* 密码不出浏览器，只把派生出的令牌发给服务端校验 */
+      const auth = await deriveAuth(input);
+      const res = await fetch(CONFIG.API.login, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return rejectPassword(err.error || '密码错误，请重试');
+      }
+
+      authToken = auth;
       passwordGate.style.display = 'none';
       adminPanel.style.display = 'block';
       initAdmin();
-    } else {
-      passwordInput.classList.add('shake');
-      passwordError.style.display = 'block';
-      setTimeout(() => {
-        passwordInput.classList.remove('shake');
-      }, 400);
-      passwordInput.value = '';
+    } catch (err) {
+      rejectPassword('无法连接服务端：' + err.message);
+    } finally {
+      checkingPassword = false;
     }
   };
+
+  function rejectPassword(message) {
+    passwordInput.classList.add('shake');
+    passwordError.textContent = message;
+    passwordError.style.display = 'block';
+    setTimeout(() => passwordInput.classList.remove('shake'), 400);
+    passwordInput.value = '';
+  }
 
   /* 回车提交密码 */
   if (passwordInput) {
@@ -257,52 +315,27 @@
 
   /* ==================== 保存并部署 ==================== */
   window.saveAndDeploy = async function() {
-    if (!ghToken) {
-      showToast('部署凭证未配置', 'error');
+    if (!authToken) {
+      showToast('登录状态已失效，请重新输入密码', 'error');
       return;
     }
 
     deployBtn.disabled = true;
-    showDeployStatus('deploying', '正在提交到 GitHub 仓库...');
+    showDeployStatus('deploying', '正在提交链接数据...');
 
     try {
-      const { owner, repo, branch, filePath, commitMessage } = CONFIG.GITHUB_CONFIG;
-
-      /* Step 1: 获取当前文件的 SHA（用于更新） */
-      showDeployStatus('deploying', '正在获取文件信息...');
-      const fileRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`, {
-        headers: { 'Authorization': `token ${ghToken}`, 'Accept': 'application/vnd.github.v3+json' }
-      });
-
-      let sha = null;
-      if (fileRes.ok) {
-        const fileData = await fileRes.json();
-        sha = fileData.sha;
-      }
-
-      /* Step 2: 编码新内容并提交 */
-      showDeployStatus('deploying', '正在提交链接数据...');
-      const content = JSON.stringify({ links }, null, 2);
-      const base64Content = btoa(unescape(encodeURIComponent(content)));
-
-      const updateRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, {
-        method: 'PUT',
+      const updateRes = await fetch(CONFIG.API.deploy, {
+        method: 'POST',
         headers: {
-          'Authorization': `token ${ghToken}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/vnd.github.v3+json'
+          'X-Admin-Auth': authToken
         },
-        body: JSON.stringify({
-          message: commitMessage,
-          content: base64Content,
-          sha: sha,
-          branch: branch
-        })
+        body: JSON.stringify({ links })
       });
 
       if (!updateRes.ok) {
         const errData = await updateRes.json().catch(() => ({}));
-        throw new Error(errData.message || `GitHub API 返回 ${updateRes.status}`);
+        throw new Error(errData.error || `服务端返回 ${updateRes.status}`);
       }
 
       /* Step 3: 等待部署 */
@@ -318,10 +351,8 @@
 
     } catch (err) {
       console.error('部署失败:', err);
-      let errMsg = err.message || '未知错误';
-      if (errMsg.includes('401')) errMsg = 'Token 无效或已过期，请检查';
-      if (errMsg.includes('404')) errMsg = '仓库不存在或 Token 无仓库权限';
-      if (errMsg.includes('403')) errMsg = 'Token 权限不足，需要 repo 权限';
+      /* 服务端已返回中文原因，这里只兜底网络层异常 */
+      const errMsg = err.message || '未知错误';
       showDeployStatus('error', '部署失败: ' + errMsg);
       showToast('部署失败: ' + errMsg, 'error');
     } finally {

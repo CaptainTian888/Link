@@ -1,14 +1,14 @@
 /**
- * Cloudflare Pages Function — /api/deploy
+ * Captain Link — Worker 入口
  *
- * 代替前端提交 links.json，GitHub Token 只存在于服务端环境变量，浏览器拿不到。
+ * 静态资源由 ASSETS 绑定直接服务；只有 /api/* 走下面的逻辑。
+ * GitHub Token 与管理密码哈希都只存在于 Worker 的环境变量里，浏览器拿不到。
  *
- * 需要在 Cloudflare Pages → Settings → Variables and Secrets 配置：
+ * 需要在 Worker → Settings → Variables and Secrets 配置：
  *   GITHUB_TOKEN     (Secret)  只授权本仓库、只给 Contents: Read and write 的 token
  *   ADMIN_AUTH_HASH  (Secret)  管理密码派生出的 auth token 的 SHA-256（十六进制小写）
  *
- * 可选覆盖（不配则用下面的默认值）：
- *   GH_OWNER / GH_REPO / GH_BRANCH / GH_PATH
+ * 可选覆盖：GH_OWNER / GH_REPO / GH_BRANCH / GH_PATH
  */
 
 const DEFAULTS = {
@@ -19,6 +19,8 @@ const DEFAULTS = {
 };
 
 const MAX_LINKS = 2000;
+
+/* ==================== 工具 ==================== */
 
 function json(body, status = 200) {
     return new Response(JSON.stringify(body), {
@@ -54,6 +56,12 @@ function timingSafeEqual(a, b) {
     return diff === 0;
 }
 
+/** 校验 X-Admin-Auth / body.auth 是否匹配 ADMIN_AUTH_HASH */
+async function authOk(env, auth) {
+    if (typeof auth !== 'string' || !auth) return false;
+    return timingSafeEqual(await sha256Hex(auth), env.ADMIN_AUTH_HASH.trim().toLowerCase());
+}
+
 /**
  * 只接受本站的链接结构，避免这个接口被拿去写任意内容。
  * 逐条挑出白名单字段，多余字段直接丢弃。
@@ -80,21 +88,37 @@ function sanitizeLinks(input) {
     return { links: out };
 }
 
-export async function onRequestPost({ request, env }) {
+/* ==================== /api/login ==================== */
+
+async function handleLogin(request, env) {
+    if (!env.ADMIN_AUTH_HASH) {
+        return json({ error: '服务端未配置 ADMIN_AUTH_HASH' }, 500);
+    }
+
+    let body;
+    try {
+        body = await request.json();
+    } catch {
+        return json({ error: '请求体不是合法 JSON' }, 400);
+    }
+
+    if (!(await authOk(env, body && body.auth))) {
+        return json({ ok: false, error: '密码错误' }, 401);
+    }
+    return json({ ok: true });
+}
+
+/* ==================== /api/deploy ==================== */
+
+async function handleDeploy(request, env) {
     if (!env.GITHUB_TOKEN || !env.ADMIN_AUTH_HASH) {
         return json({ error: '服务端未配置 GITHUB_TOKEN / ADMIN_AUTH_HASH' }, 500);
     }
 
-    // ─── 鉴权 ─── //
     const auth = request.headers.get('X-Admin-Auth') || '';
     if (!auth) return json({ error: '缺少鉴权头' }, 401);
+    if (!(await authOk(env, auth))) return json({ error: '鉴权失败' }, 401);
 
-    const expected = env.ADMIN_AUTH_HASH.trim().toLowerCase();
-    if (!timingSafeEqual(await sha256Hex(auth), expected)) {
-        return json({ error: '鉴权失败' }, 401);
-    }
-
-    // ─── 请求体校验 ─── //
     let body;
     try {
         body = await request.json();
@@ -119,7 +143,7 @@ export async function onRequestPost({ request, env }) {
         'User-Agent': 'captain-link'
     };
 
-    // ─── 取当前文件 SHA ─── //
+    // 取当前文件 SHA
     let sha = null;
     try {
         const getResp = await fetch(
@@ -136,7 +160,7 @@ export async function onRequestPost({ request, env }) {
         return json({ error: `读取 GitHub 文件失败：${e.message}` }, 502);
     }
 
-    // ─── 提交 ─── //
+    // 提交
     const putBody = {
         message: 'Auto-update links via Captain Link Admin',
         content: toBase64(content),
@@ -164,3 +188,23 @@ export async function onRequestPost({ request, env }) {
     const out = await putResp.json().catch(() => ({}));
     return json({ ok: true, count: result.links.length, commit: out.commit && out.commit.sha });
 }
+
+/* ==================== 入口 ==================== */
+
+export default {
+    async fetch(request, env) {
+        const { pathname } = new URL(request.url);
+
+        if (pathname === '/api/login' || pathname === '/api/deploy') {
+            if (request.method !== 'POST') {
+                return json({ error: 'Method Not Allowed' }, 405);
+            }
+            return pathname === '/api/login'
+                ? handleLogin(request, env)
+                : handleDeploy(request, env);
+        }
+
+        /* 其余路径交回静态资源；命中不到就是 404（与改造前行为一致） */
+        return env.ASSETS.fetch(request);
+    }
+};

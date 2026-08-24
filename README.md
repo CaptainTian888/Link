@@ -18,13 +18,12 @@
 ├── index.html          # 主展示页
 ├── admin.html          # 管理后台页
 ├── links.json          # 链接数据
-├── .nojekyll           # 禁用 Jekyll 处理
+├── wrangler.jsonc      # Worker 配置（静态资源 + /api 路由）
+├── .assetsignore       # 不对外提供的文件
 ├── css/
 │   └── style.css       # 全部样式
-├── functions/
-│   └── api/
-│       ├── login.js    # Pages Function：校验管理密码
-│       └── deploy.js   # Pages Function：代理写回 links.json
+├── worker/
+│   └── index.js        # Worker：/api/login 校验密码、/api/deploy 写回 links.json
 └── js/
     ├── config.js       # 网站配置（不含任何凭证）
     ├── main.js         # 主页逻辑
@@ -41,8 +40,10 @@
 
 ## 部署配置
 
-后台的密码校验和 GitHub 提交都走同源的 Pages Function，**凭证只存在于服务端**。
-在 Cloudflare Pages → **Settings** → **Variables and Secrets**（注意选 **Production** 环境）添加两个 **Secret**：
+本站部署为 **Cloudflare Worker + 静态资源**（`wrangler.jsonc`）：静态文件由 ASSETS 绑定直接服务，
+只有 `/api/login` 和 `/api/deploy` 进入 `worker/index.js`，**凭证只存在于服务端**。
+
+在 Cloudflare Dashboard → **Workers & Pages** → `link` → **Settings** → **Variables and Secrets** 添加两个 **Secret**：
 
 | 变量名 | 值 |
 | --- | --- |
@@ -60,9 +61,9 @@ await printAdminAuthHash('你要设置的管理密码')
 > 密码经 PBKDF2（20 万次迭代、salt `link-admin-auth-v1`）派生成 auth token，
 > 服务端只保存它的 SHA-256 —— 既反推不出密码，环境变量泄漏也换不出可用的令牌。
 
-改完环境变量记得去 **Deployments** 对最新一条点 **Retry deployment**，否则不会生效。
+Secret 保存后立即对运行中的 Worker 生效，不需要重新部署。
 
-可选变量（不配则用 `functions/api/deploy.js` 里的默认值）：`GH_OWNER`、`GH_REPO`、`GH_BRANCH`、`GH_PATH`。
+可选变量（不配则用 `worker/index.js` 里的默认值）：`GH_OWNER`、`GH_REPO`、`GH_BRANCH`、`GH_PATH`。
 
 > ⚠️ **不要把 Token 或密码写进 `js/` 下的任何文件**（包括数组拆分、Base64、XOR 等混淆手法）。
 > 静态站点的 JS 对所有访客可读，混淆只会绕过 GitHub 的密钥扫描告警，不会提高任何安全性。
@@ -77,7 +78,7 @@ await printAdminAuthHash('你要设置的管理密码')
 - 纯 HTML / CSS / JavaScript（无构建工具、无框架）
 - iframe 嵌入式网页小窗预览
 - GitHub Contents API — 自动部署（经服务端代理调用）
-- CloudFlare Pages — 静态托管 + Pages Functions（后台接口）
+- CloudFlare Workers — 静态资源托管 + `/api` 后台接口
 
 ## License
 

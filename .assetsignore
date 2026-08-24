@@ -1,0 +1,6 @@
+# 这些文件不需要作为静态资源对外提供
+worker/
+wrangler.jsonc
+.assetsignore
+.gitignore
+README.md

@@ -9,6 +9,7 @@
 - **自动部署** — 后台编辑链接后，一键保存自动部署上线
 - **搜索过滤** — 主页支持按标题、描述、URL、分类实时搜索
 - **视图切换** — 卡片模式 / 列表模式一键切换，按域名分级展示
+- **域名拓扑** — 主页可展开任一一级域名，从证书透明度日志反查其子域名，标出已收录 / 未收录
 - **响应式设计** — 完美适配桌面、平板、手机
 - **暗色主题** — 玻璃拟态卡片 + 动画渐变背景
 
@@ -23,7 +24,8 @@
 ├── css/
 │   └── style.css       # 全部样式
 ├── worker/
-│   └── index.js        # Worker：/api/login 校验密码、/api/deploy 写回 links.json
+│   └── index.js        # Worker：/api/login 校验密码、/api/deploy 写回 links.json、
+│                       #         /api/subdomains 查子域名
 └── js/
     ├── config.js       # 网站配置（不含任何凭证）
     ├── main.js         # 主页逻辑
@@ -64,6 +66,19 @@ await printAdminAuthHash('你要设置的管理密码')
 Secret 保存后立即对运行中的 Worker 生效，不需要重新部署。
 
 可选变量（不配则用 `worker/index.js` 里的默认值）：`GH_OWNER`、`GH_REPO`、`GH_BRANCH`、`GH_PATH`。
+
+## 域名拓扑（`/api/subdomains`）
+
+主页「域名拓扑」区块把 `links.json` 里的链接按一级域名归拢，展开某个域名时才请求
+`GET /api/subdomains?domain=<一级域名>`，由 Worker 去查证书透明度日志。
+
+- **双数据源**：先试 certSpotter，失败再试 crt.sh（crt.sh 经常 502），返回里的 `source` 标明实际来源
+- **结果缓存 6 小时**：走 Cloudflare Cache API，失败结果不入缓存
+- **域名白名单**：只接受 `links.json` 中已出现的一级域名，否则这个公开接口会变成任何人可用的域名扫描代理
+- 无需任何凭证，两个数据源都是免登录的公开 API
+
+> 证书透明度日志只反映**签发过证书**的名字：没申请过证书的子域名查不到，
+> 已经下线但证书还在有效期内的会照样列出。它是参考，不是权威清单。
 
 > ⚠️ **不要把 Token 或密码写进 `js/` 下的任何文件**（包括数组拆分、Base64、XOR 等混淆手法）。
 > 静态站点的 JS 对所有访客可读，混淆只会绕过 GitHub 的密钥扫描告警，不会提高任何安全性。

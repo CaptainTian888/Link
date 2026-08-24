@@ -20,6 +20,26 @@ const DEFAULTS = {
 
 const MAX_LINKS = 2000;
 
+/* 子域名探测：证书透明度日志查询慢且常抽风，结果缓存 6 小时 */
+const CT_TIMEOUT_MS = 20000;
+const SUBDOMAIN_CACHE_SECONDS = 6 * 3600;
+const MAX_SUBDOMAINS = 300;
+
+/* 按顺序尝试，第一个成功的即采用。crt.sh 经常 502，所以放在备选位 */
+const CT_SOURCES = [
+    {
+        name: 'certspotter',
+        url: d => `https://api.certspotter.com/v1/issuances?domain=${encodeURIComponent(d)}` +
+                  '&include_subdomains=true&expand=dns_names',
+        extract: entries => entries.flatMap(e => Array.isArray(e.dns_names) ? e.dns_names : [])
+    },
+    {
+        name: 'crt.sh',
+        url: d => `https://crt.sh/?q=${encodeURIComponent('%.' + d)}&output=json`,
+        extract: entries => entries.flatMap(e => String(e.name_value || '').split('\n'))
+    }
+];
+
 /* ==================== 工具 ==================== */
 
 function json(body, status = 200) {
@@ -86,6 +106,109 @@ function sanitizeLinks(input) {
         out.push({ id, title, url, description, category });
     }
     return { links: out };
+}
+
+/** 取末两段作为一级域名，与前端 hostname.split('.').length <= 2 的判断保持一致 */
+function rootDomainOf(hostname) {
+    const parts = hostname.toLowerCase().replace(/^www\./, '').split('.');
+    return parts.length <= 2 ? parts.join('.') : parts.slice(-2).join('.');
+}
+
+/* ==================== /api/subdomains ==================== */
+
+/**
+ * 从证书透明度日志（crt.sh）反查某个一级域名签发过的子域名。
+ *
+ * 这是公开接口，所以只接受 links.json 里已经出现过的一级域名 ——
+ * 否则就成了任何人都能拿来扫描任意域名的开放代理。
+ */
+async function handleSubdomains(request, env, ctx) {
+    const url = new URL(request.url);
+    const domain = (url.searchParams.get('domain') || '').trim().toLowerCase();
+
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain) || domain.length > 253) {
+        return json({ error: '域名格式不合法' }, 400);
+    }
+
+    /* 白名单校验：必须是本站已收录链接的一级域名 */
+    const known = await knownRootDomains(request, env);
+    if (!known.has(domain)) {
+        return json({ error: '该域名不在本站收录范围内' }, 403);
+    }
+
+    /* 命中缓存直接返回 */
+    const cacheKey = new Request(`${url.origin}/api/subdomains?domain=${domain}`);
+    const cache = caches.default;
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+
+    let rawNames = null;
+    let usedSource = null;
+    const failures = [];
+
+    for (const source of CT_SOURCES) {
+        try {
+            const resp = await fetch(source.url(domain), {
+                headers: { 'User-Agent': 'captain-link', 'Accept': 'application/json' },
+                signal: AbortSignal.timeout(CT_TIMEOUT_MS)
+            });
+            if (!resp.ok) { failures.push(`${source.name} 返回 ${resp.status}`); continue; }
+
+            const entries = await resp.json();
+            if (!Array.isArray(entries)) { failures.push(`${source.name} 返回了非预期格式`); continue; }
+
+            rawNames = source.extract(entries);
+            usedSource = source.name;
+            break;
+        } catch (e) {
+            failures.push(e.name === 'TimeoutError'
+                ? `${source.name} 响应超时`
+                : `${source.name} 请求失败：${e.message}`);
+        }
+    }
+
+    if (!usedSource) return json({ error: `证书日志查询失败（${failures.join('；')}）` }, 502);
+
+    /* 统一清洗：去掉 *. 通配符前缀、只保留本域下的合法主机名 */
+    const names = new Set();
+    for (const raw of rawNames) {
+        const name = String(raw).trim().toLowerCase().replace(/^\*\./, '');
+        if (!name || name === domain) continue;
+        if (!name.endsWith('.' + domain)) continue;
+        if (!/^[a-z0-9.-]+$/.test(name)) continue;
+        names.add(name);
+    }
+
+    const subdomains = [...names].sort().slice(0, MAX_SUBDOMAINS);
+    const body = {
+        domain,
+        subdomains,
+        total: names.size,
+        truncated: names.size > subdomains.length,
+        source: usedSource,
+        fetchedAt: new Date().toISOString()
+    };
+
+    const response = json(body);
+    response.headers.set('Cache-Control', `public, max-age=${SUBDOMAIN_CACHE_SECONDS}`);
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    return response;
+}
+
+/** 读 links.json（走 ASSETS，不额外发外部请求），收集其中出现过的一级域名 */
+async function knownRootDomains(request, env) {
+    const roots = new Set();
+    try {
+        const resp = await env.ASSETS.fetch(new Request(new URL('/links.json', request.url)));
+        if (!resp.ok) return roots;
+        const data = await resp.json();
+        for (const link of data.links || []) {
+            try {
+                roots.add(rootDomainOf(new URL(link.url).hostname));
+            } catch { /* 跳过非法 URL */ }
+        }
+    } catch { /* 读不到就返回空集合，等于全部拒绝 */ }
+    return roots;
 }
 
 /* ==================== /api/login ==================== */
@@ -192,8 +315,16 @@ async function handleDeploy(request, env) {
 /* ==================== 入口 ==================== */
 
 export default {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
         const { pathname } = new URL(request.url);
+
+        /* 公开只读接口，主页用它展示域名拓扑 */
+        if (pathname === '/api/subdomains') {
+            if (request.method !== 'GET') {
+                return json({ error: 'Method Not Allowed' }, 405);
+            }
+            return handleSubdomains(request, env, ctx);
+        }
 
         if (pathname === '/api/login' || pathname === '/api/deploy') {
             if (request.method !== 'POST') {

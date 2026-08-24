@@ -1350,3 +1350,197 @@ input, textarea { font-family: inherit; outline: none; }
   background: rgba(0, 212, 255, 0.25);
   color: var(--text-primary);
 }
+
+/* ==================== 域名拓扑 ==================== */
+.domain-map {
+  max-width: 860px;
+  margin: 0 auto 36px;
+}
+
+.domain-map-head {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.domain-map-head h2 {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.domain-map-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.domain-map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.domain-row {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.domain-row:hover {
+  border-color: var(--card-hover-border);
+}
+
+.domain-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.domain-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.25s ease;
+}
+
+.domain-row-head[aria-expanded="true"] .domain-chevron {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+
+.domain-name {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.domain-owned {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 3px 9px;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+}
+
+.domain-row-body {
+  padding: 0 16px 14px;
+  border-top: 1px solid var(--card-border);
+}
+
+.domain-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.domain-loading .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--card-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: domain-spin 0.7s linear infinite;
+}
+
+@keyframes domain-spin {
+  to { transform: rotate(360deg); }
+}
+
+.domain-summary {
+  padding: 12px 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.domain-source {
+  float: right;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.domain-summary strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.domain-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.domain-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.domain-sub-name {
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.domain-sub.is-owned .domain-sub-name {
+  color: var(--text-primary);
+}
+
+.domain-sub-tag {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  border: 1px solid var(--card-border);
+}
+
+.domain-sub.is-owned .domain-sub-tag {
+  color: var(--success);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.domain-map-empty,
+.domain-error {
+  padding: 14px 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.domain-error {
+  color: var(--danger);
+}
+
+.domain-retry {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 640px) {
+  .domain-map { padding: 0 4px; }
+  .domain-map-hint { font-size: 0.76rem; }
+  .domain-sub { flex-wrap: wrap; gap: 6px; }
+}

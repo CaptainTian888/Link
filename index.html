@@ -73,6 +73,17 @@
     </div>
   </div>
 
+  <!-- 域名拓扑：从证书透明度日志反查子域名 -->
+  <section class="domain-map" id="domainMap">
+    <div class="domain-map-head">
+      <h2>域名拓扑</h2>
+      <p class="domain-map-hint">数据来自证书透明度日志（certSpotter / crt.sh），展开任一域名查看其签发过的子域名</p>
+    </div>
+    <div class="domain-map-list" id="domainMapList">
+      <!-- 由 main.js 动态渲染 -->
+    </div>
+  </section>
+
   <!-- 视图切换 -->
   <div class="view-toggle" id="viewToggle">
     <button class="toggle-btn active" data-view="card" aria-label="卡片视图">

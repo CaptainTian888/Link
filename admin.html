@@ -101,6 +101,15 @@
       </div>
     </div>
 
+    <!-- 域名拓扑：登录后才渲染，数据来自证书透明度日志 -->
+    <div class="section-card">
+      <h3>域名拓扑</h3>
+      <p class="domain-map-hint">数据来自证书透明度日志（certSpotter / crt.sh），展开任一域名查看其签发过的子域名</p>
+      <div class="domain-map-list" id="domainMapList">
+        <!-- 由 admin.js 动态渲染 -->
+      </div>
+    </div>
+
     <!-- 保存部署按钮 -->
     <div class="deploy-bar">
       <button class="btn btn-primary" id="deployBtn" onclick="saveAndDeploy()">

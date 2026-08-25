@@ -119,10 +119,19 @@ function rootDomainOf(hostname) {
 /**
  * 从证书透明度日志反查某个一级域名签发过的子域名（certSpotter 为主，crt.sh 兜底）。
  *
- * 这是公开接口，所以只接受 links.json 里已经出现过的一级域名 ——
- * 否则就成了任何人都能拿来扫描任意域名的开放代理。
+ * 仅限已登录管理员：域名拓扑只在后台展示，接口也必须跟着鉴权 ——
+ * 否则藏了 UI 而接口还敞着，等于没藏。
+ * 另外仍只接受 links.json 里出现过的一级域名，避免被当成任意域名的扫描代理。
  */
 async function handleSubdomains(request, env, ctx) {
+    if (!env.ADMIN_AUTH_HASH) {
+        return json({ error: '服务端未配置 ADMIN_AUTH_HASH' }, 500);
+    }
+
+    const auth = request.headers.get('X-Admin-Auth') || '';
+    if (!auth) return json({ error: '缺少鉴权头' }, 401);
+    if (!(await authOk(env, auth))) return json({ error: '鉴权失败' }, 401);
+
     const url = new URL(request.url);
     const domain = (url.searchParams.get('domain') || '').trim().toLowerCase();
 
@@ -328,7 +337,7 @@ export default {
     async fetch(request, env, ctx) {
         const { pathname } = new URL(request.url);
 
-        /* 公开只读接口，主页用它展示域名拓扑 */
+        /* 只读接口，但同样需要管理员鉴权（域名拓扑只在后台展示） */
         if (pathname === '/api/subdomains') {
             if (request.method !== 'GET') {
                 return json({ error: 'Method Not Allowed' }, 405);

@@ -22,7 +22,6 @@
       allLinks = data.links || [];
       renderStats(allLinks);
       renderCardView(allLinks);
-      renderDomainMap(allLinks);
     } catch (err) {
       console.error('加载链接失败:', err);
       renderEmpty();
@@ -75,104 +74,6 @@
       el.textContent = target;
     }
     requestAnimationFrame(update);
-  }
-
-  /* ==================== 域名拓扑（crt.sh 子域名反查） ==================== */
-
-  /** 取末两段作为一级域名，与统计口径保持一致 */
-  function rootDomainOf(hostname) {
-    const parts = hostname.toLowerCase().replace(/^www\./, '').split('.');
-    return parts.length <= 2 ? parts.join('.') : parts.slice(-2).join('.');
-  }
-
-  function renderDomainMap(links) {
-    const listEl = document.getElementById('domainMapList');
-    if (!listEl) return;
-
-    /* 按一级域名归拢，记下每个一级域名下已收录的主机名 */
-    const groups = new Map();
-    links.forEach(link => {
-      let host;
-      try { host = new URL(link.url).hostname.toLowerCase().replace(/^www\./, ''); }
-      catch { return; }
-      const root = rootDomainOf(host);
-      if (!groups.has(root)) groups.set(root, new Set());
-      groups.get(root).add(host);
-    });
-
-    if (groups.size === 0) {
-      listEl.innerHTML = '<p class="domain-map-empty">暂无域名数据</p>';
-      return;
-    }
-
-    const roots = [...groups.keys()].sort();
-    listEl.innerHTML = roots.map(root => `
-      <div class="domain-row" data-domain="${escapeHtml(root)}">
-        <button class="domain-row-head" type="button" aria-expanded="false">
-          <svg class="domain-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-          </svg>
-          <span class="domain-name">${escapeHtml(root)}</span>
-          <span class="domain-owned">已收录 ${groups.get(root).size}</span>
-        </button>
-        <div class="domain-row-body" hidden></div>
-      </div>
-    `).join('');
-
-    listEl.querySelectorAll('.domain-row-head').forEach(head => {
-      head.addEventListener('click', () => toggleDomainRow(head, groups));
-    });
-  }
-
-  async function toggleDomainRow(head, groups) {
-    const row = head.closest('.domain-row');
-    const body = row.querySelector('.domain-row-body');
-    const domain = row.dataset.domain;
-    const expanded = head.getAttribute('aria-expanded') === 'true';
-
-    head.setAttribute('aria-expanded', String(!expanded));
-    body.hidden = expanded;
-    if (expanded || row.dataset.loaded === 'true') return;
-
-    /* 首次展开才发请求，避免主页一次性打十几个慢查询 */
-    row.dataset.loaded = 'true';
-    body.innerHTML = '<div class="domain-loading"><div class="spinner"></div><span>正在查询证书透明度日志...</span></div>';
-
-    try {
-      const res = await fetch('/api/subdomains?domain=' + encodeURIComponent(domain));
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `服务端返回 ${res.status}`);
-      renderSubdomains(body, data, groups.get(domain) || new Set());
-    } catch (err) {
-      row.dataset.loaded = '';   /* 允许重试 */
-      body.innerHTML = `<p class="domain-error">查询失败：${escapeHtml(err.message)}<br><span class="domain-retry">收起后再次展开可重试</span></p>`;
-    }
-  }
-
-  function renderSubdomains(body, data, owned) {
-    const subs = data.subdomains || [];
-    if (subs.length === 0) {
-      body.innerHTML = '<p class="domain-map-empty">证书日志中没有查到子域名</p>';
-      return;
-    }
-
-    const items = subs.map(name => {
-      const isOwned = owned.has(name);
-      return `<li class="domain-sub ${isOwned ? 'is-owned' : ''}">
-        <span class="domain-sub-name">${escapeHtml(name)}</span>
-        <span class="domain-sub-tag">${isOwned ? '已收录' : '未收录'}</span>
-      </li>`;
-    }).join('');
-
-    const ownedCount = subs.filter(n => owned.has(n)).length;
-    body.innerHTML = `
-      <div class="domain-summary">
-        共 <strong>${data.total}</strong> 个子域名${data.truncated ? `（仅显示前 ${subs.length} 个）` : ''}
-        · 已收录 <strong>${ownedCount}</strong> · 未收录 <strong>${subs.length - ownedCount}</strong>
-        <span class="domain-source">来源 ${escapeHtml(data.source || '证书日志')}</span>
-      </div>
-      <ul class="domain-sub-list">${items}</ul>
-    `;
   }
 
   /* ==================== 卡片视图（iframe 嵌入式小窗，按域名分级） ==================== */

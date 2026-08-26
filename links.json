@@ -5,273 +5,312 @@
       "title": "captain.bz",
       "url": "https://captain.bz",
       "description": "Captain",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-04",
       "title": "captain.ninja",
       "url": "https://captain.ninja",
       "description": "Captain Ninja",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-06",
       "title": "lioncaptain.com",
       "url": "https://lioncaptain.com",
       "description": "LionCaptain",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-07",
       "title": "mabang.group",
       "url": "https://mabang.group",
       "description": "Mabang Group",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-08",
       "title": "mabang.org",
       "url": "https://mabang.org",
       "description": "Mabang Org",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-09",
       "title": "ninja.bi",
       "url": "https://ninja.bi",
       "description": "Ninja BI",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-10",
       "title": "ninthclub.com",
       "url": "https://ninthclub.com",
       "description": "NinthClub",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-11",
       "title": "partnerrealm.com",
       "url": "https://partnerrealm.com",
       "description": "PartnerRealm",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-12",
       "title": "shinevista.group",
       "url": "https://shinevista.group",
       "description": "ShineVista Group",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-13",
       "title": "stablechain.group",
       "url": "https://stablechain.group",
       "description": "StableChain Group",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-14",
       "title": "tianzeqi.dev",
       "url": "https://tianzeqi.dev/",
       "description": "田泽琦dev",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-15",
       "title": "stablegold.cc",
       "url": "https://stablegold.cc",
       "description": "StableGold",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-16",
       "title": "tianzeqi.cc",
       "url": "https://tianzeqi.cc",
       "description": "田泽琦CC",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-17",
       "title": "tianzeqi.cn",
       "url": "https://tianzeqi.cn",
       "description": "田泽琦 CN",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "offline"
     },
     {
       "id": "main-18",
       "title": "tianzeqi.com",
       "url": "https://tianzeqi.com",
       "description": "田泽琦COM",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-19",
       "title": "tianzeqi.link",
       "url": "https://tianzeqi.link",
       "description": "田泽琦LINK",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-20",
       "title": "tianzeqi.net",
       "url": "https://tianzeqi.net",
       "description": "田泽琦NET",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-21",
       "title": "tianzeqi.top",
       "url": "https://tianzeqi.top",
       "description": "田泽琦TOP",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "main-22",
       "title": "tianzeqi.xyz",
       "url": "https://tianzeqi.xyz",
       "description": "田泽琦XYZ",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-23",
       "title": "wenlian.trade",
       "url": "https://wenlian.trade",
       "description": "Wenlian Trade",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-24",
       "title": "zerohub.ai",
       "url": "https://zerohub.ai",
       "description": "ZeroHub AI",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "frame"
     },
     {
       "id": "main-01",
       "title": "20021128.xyz",
       "url": "https://20021128.xyz",
       "description": "个人主站",
-      "category": "主域名"
+      "category": "主域名",
+      "preview": "shot"
     },
     {
       "id": "sub-01",
       "title": "currency.tianzeqi.dev",
       "url": "https://currency.tianzeqi.dev",
       "description": "货币转换器工具",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-02",
       "title": "extractor.tianzeqi.dev",
       "url": "https://extractor.tianzeqi.dev",
       "description": "网页内容提取器",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-03",
       "title": "favicon.tianzeqi.dev",
       "url": "https://favicon.tianzeqi.dev",
       "description": "Favicon 图标抓取工具",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-04",
       "title": "film.tianzeqi.dev",
       "url": "https://film.tianzeqi.dev",
       "description": "视频相关服务",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-05",
       "title": "html.tianzeqi.dev",
       "url": "https://html.tianzeqi.dev",
       "description": "HTML代码在线预览工具",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-06",
       "title": "imagehub.tianzeqi.dev",
       "url": "https://imagehub.tianzeqi.dev",
       "description": "图床服务",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-07",
       "title": "json.tianzeqi.dev",
       "url": "https://json.tianzeqi.dev",
       "description": "JSON 在线编辑与格式化工具",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-08",
       "title": "net.tianzeqi.dev",
       "url": "https://net.tianzeqi.dev",
       "description": "网络诊断工具",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-09",
       "title": "time.tianzeqi.dev",
       "url": "https://time.tianzeqi.dev",
       "description": "时间仪表板",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-10",
       "title": "blog.tianzeqi.dev",
       "url": "https://blog.tianzeqi.dev",
       "description": "个人博客",
-      "category": "tianzeqi.dev 工具"
+      "category": "tianzeqi.dev 工具",
+      "preview": "frame"
     },
     {
       "id": "sub-11",
       "title": "n8n.ninja.bi/",
       "url": "https://n8n.ninja.bi/",
       "description": "n8n",
-      "category": ""
+      "category": "",
+      "preview": "frame"
     },
     {
       "id": "sub-12",
       "title": "vedio.zerohub.ai",
       "url": "https://vedio.zerohub.ai",
       "description": "视频相关服务",
-      "category": "zerohub.ai 产品"
+      "category": "zerohub.ai 产品",
+      "preview": "frame"
     },
     {
       "id": "sub-13",
       "title": "api.zerohub.ai",
       "url": "https://api.zerohub.ai",
       "description": "API 接口服务",
-      "category": "zerohub.ai 产品"
+      "category": "zerohub.ai 产品",
+      "preview": "shot"
     },
     {
       "id": "1782730815285",
       "title": "stablechain.capital",
       "url": "https://stablechain.capital/",
       "description": "稳链",
-      "category": ""
+      "category": "",
+      "preview": "frame"
     },
     {
       "id": "1782730854710",
       "title": "tianzeqi.win",
       "url": "https://tianzeqi.win/",
       "description": "田泽琦Win",
-      "category": ""
+      "category": "",
+      "preview": "shot"
     },
     {
       "id": "1785830534906",
       "title": "nav.tianzeqi.dev",
       "url": "https://nav.tianzeqi.dev",
       "description": "导航",
-      "category": ""
+      "category": "",
+      "preview": "offline"
     },
     {
       "id": "1786169046065",
       "title": "akasolv.com",
       "url": "https://akasolv.com/",
       "description": "",
-      "category": ""
+      "category": "",
+      "preview": "frame"
     }
   ]
 }

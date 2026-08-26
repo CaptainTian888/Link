@@ -27,7 +27,7 @@ const MAX_LINKS = 2000;
    常规保存只探测还没有结论的链接；后台「重新检测预览」会带 recheck 全量重跑。 */
 const PREVIEW_MODES = ['frame', 'shot', 'offline'];
 const DEFAULT_PREVIEW = 'frame';
-const PROBE_TIMEOUT_MS = 8000;
+const PROBE_TIMEOUT_MS = 12000;   // 有些自建站冷启动要 7~8 秒，给足余量免得误判离线
 const PROBE_CONCURRENCY = 6;
 const MAX_PROBES = 45;   // 留出 Worker 子请求余量（GitHub 那两次也要算）
 
@@ -139,14 +139,24 @@ async function probePreview(url) {
         }
     };
 
+    async function hit(method) {
+        const resp = await fetch(url, { ...opts, method });
+        return (resp.status === 405 || resp.status === 501) && method === 'HEAD'
+            ? fetch(url, { ...opts, method: 'GET' })
+            : resp;
+    }
+
     let resp;
     try {
-        resp = await fetch(url, { ...opts, method: 'HEAD' });
-        if (resp.status === 405 || resp.status === 501) {
-            resp = await fetch(url, { ...opts, method: 'GET' });
-        }
+        resp = await hit('HEAD');
     } catch {
-        return 'offline';
+        /* 超时或连不上先重试一次 —— 慢站点在并发探测下很容易假性超时，
+           只有连着两次都不通才判定为离线 */
+        try {
+            resp = await hit('GET');
+        } catch {
+            return 'offline';
+        }
     }
 
     if (resp.status >= 400) return 'offline';

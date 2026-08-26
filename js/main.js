@@ -36,46 +36,58 @@
    * 一旦发现焦点跑进预览，就立刻夺回焦点，并把页面滚回被拽走之前的位置。
    * 只在「近期没有用户手势」时才回滚，所以不会和正常的滚轮操作打架。
    */
-  const GESTURE_WINDOW_MS = 400;
-  let lastGestureAt = 0;
-  let restoring = false;
-  const scrollLog = [];
+  const GESTURE_WINDOW_MS = 500;   /* 手势之后这段时间内的滚动都算用户驱动 */
+  const BOOT_GRACE_MS = 1500;      /* 刚加载时浏览器可能恢复上次的滚动位置，别拦 */
 
+  let lastGestureAt = 0;
+  let allowUntil = 0;              /* 自家的程序化滚动（分组跳转）放行到这个时刻 */
+  let lastGoodY = 0;
+  let restoring = false;
+  const bootAt = performance.now();
+
+  /* 注意：跨文档的焦点转移不会在父页面派发 focusin（实测确实收不到），
+     所以不能靠焦点事件来兜，只能直接看滚动本身。 */
   ['wheel', 'touchstart', 'touchmove', 'keydown', 'mousedown', 'pointerdown'].forEach(function(type) {
     addEventListener(type, function() { lastGestureAt = performance.now(); }, { passive: true, capture: true });
   });
 
-  addEventListener('scroll', function() {
-    if (restoring) return;
-    scrollLog.push({ t: performance.now(), y: window.scrollY });
-    if (scrollLog.length > 60) scrollLog.shift();
-  }, { passive: true });
-
-  /** 取 ms 毫秒之前的滚动位置 */
-  function scrollYBefore(ms) {
-    const cutoff = performance.now() - ms;
-    for (let i = scrollLog.length - 1; i >= 0; i--) {
-      if (scrollLog[i].t <= cutoff) return scrollLog[i].y;
-    }
-    return scrollLog.length ? scrollLog[0].y : window.scrollY;
+  /** 放行一次自家发起的滚动 */
+  function allowProgrammaticScroll(ms) {
+    allowUntil = performance.now() + (ms || 1200);
   }
 
-  document.addEventListener('focusin', function(e) {
-    const el = e.target;
-    if (!el || el.tagName !== 'IFRAME' || !el.closest('.link-preview')) return;
+  addEventListener('scroll', function() {
+    if (restoring) return;
 
-    const userDriven = performance.now() - lastGestureAt < GESTURE_WINDOW_MS;
-    const target = scrollYBefore(300);
+    const now = performance.now();
+    const y = window.scrollY;
 
-    /* 把焦点还给文档本身，别留在预览里 */
-    if (typeof el.blur === 'function') el.blur();
+    const userDriven = now - lastGestureAt < GESTURE_WINDOW_MS;
+    const ourOwn = now < allowUntil;
+    const booting = now - bootAt < BOOT_GRACE_MS;
+    /* 浏览器 UI（查找栏、开发者工具）拿着焦点时，滚动多半是「在页面内查找」
+       之类的正常行为，不要拦 */
+    const uiFocused = typeof document.hasFocus === 'function' && !document.hasFocus();
 
-    if (!userDriven && Math.abs(window.scrollY - target) > 2) {
+    if (userDriven || ourOwn || booting || uiFocused) {
+      lastGoodY = y;
+      return;
+    }
+
+    /* 走到这里 = 没有任何用户操作，页面却自己动了。
+       元凶是预览里的站点调用 focus()，浏览器为了露出焦点元素滚动了外层页面。
+       把焦点夺回来，并滚回原位。 */
+    const active = document.activeElement;
+    if (active && active.tagName === 'IFRAME' && active.closest('.link-preview')) {
+      if (typeof active.blur === 'function') active.blur();
+    }
+
+    if (Math.abs(y - lastGoodY) > 1) {
       restoring = true;
-      window.scrollTo({ top: target, behavior: 'auto' });
+      window.scrollTo({ top: lastGoodY, behavior: 'auto' });
       requestAnimationFrame(function() { restoring = false; });
     }
-  }, true);
+  }, { passive: true });
 
   /* ==================== 懒加载观察器 ==================== */
 
@@ -342,6 +354,8 @@
     if (!target) return;
     target.classList.remove('is-collapsed');
     collapsed.delete(chip.dataset.target.replace(/^group-/, ''));
+    /* 这是我们自己发起的滚动，先给滚动防护放行，免得被当成异常滚动拉回去 */
+    allowProgrammaticScroll(1500);
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 

@@ -50,8 +50,44 @@
   const linkForm       = document.getElementById('linkForm');
   const linkList       = document.getElementById('linkList');
   const deployBtn      = document.getElementById('deployBtn');
+  const recheckBtn     = document.getElementById('recheckBtn');
   const deployStatus   = document.getElementById('deployStatus');
   const editModal      = document.getElementById('editModal');
+  const adminBar       = document.getElementById('adminBar');
+  const dirtyBadge     = document.getElementById('dirtyBadge');
+  const adminSearch    = document.getElementById('adminSearch');
+  const urlInput       = document.getElementById('linkUrl');
+  const urlFavicon     = document.getElementById('urlFavicon');
+  const urlHint        = document.getElementById('urlHint');
+
+  const D = window.LinkDomain;
+
+  /* ==================== 未保存改动追踪 ==================== */
+  /* 改了链接但没点保存就关页面 = 白改，这里挡一道 */
+  let dirtyCount = 0;
+
+  function markDirty() {
+    dirtyCount++;
+    renderDirty();
+  }
+
+  function clearDirty() {
+    dirtyCount = 0;
+    renderDirty();
+  }
+
+  function renderDirty() {
+    if (!dirtyBadge) return;
+    dirtyBadge.hidden = dirtyCount === 0;
+    dirtyBadge.textContent = `${dirtyCount} 项未保存`;
+    if (adminBar) adminBar.classList.toggle('is-dirty', dirtyCount > 0);
+  }
+
+  window.addEventListener('beforeunload', function(e) {
+    if (dirtyCount === 0) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
 
   /* ==================== 密码验证 ==================== */
   let checkingPassword = false;
@@ -138,45 +174,129 @@
     }
   }
 
-  /* ==================== 渲染链接列表（含排序按钮） ==================== */
+  /* ==================== 渲染链接列表（按域名分组） ==================== */
+
+  /* 预览状态角标：和首页的三态一一对应，方便一眼看出哪些站嵌不了 */
+  const PREVIEW_LABEL = {
+    frame:   { text: '可嵌入', cls: 'ok' },
+    shot:    { text: '截图',   cls: 'warn' },
+    offline: { text: '离线',   cls: 'bad' }
+  };
+
   function renderLinkList() {
     const countEl = document.getElementById('linkCount');
     if (countEl) countEl.textContent = `(${links.length})`;
 
     if (links.length === 0) {
-      linkList.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">暂无链接，请在上方添加</p>';
+      linkList.innerHTML = '<p class="list-placeholder">暂无链接，请在上方添加</p>';
       return;
     }
 
-    linkList.innerHTML = links.map((link, index) => `
-      <div class="link-list-item" data-link-id="${link.id}">
+    const keyword = adminSearch ? adminSearch.value.trim().toLowerCase() : '';
+    const visible = keyword
+      ? links.filter(l =>
+          (l.title || '').toLowerCase().includes(keyword) ||
+          (l.url || '').toLowerCase().includes(keyword) ||
+          (l.category || '').toLowerCase().includes(keyword))
+      : links;
+
+    if (visible.length === 0) {
+      linkList.innerHTML = '<p class="list-placeholder">没有匹配的链接</p>';
+      return;
+    }
+
+    /* 与首页同一套分组逻辑（js/domain.js），保证后台看到的层级 = 前台展示的层级 */
+    const { groups, singles } = D.groupLinks(visible);
+    const blocks = groups.map(g => buildAdminGroup(g.domain, g.domain, g.links));
+    if (singles.length) blocks.push(buildAdminGroup('singles', '独立站点', singles));
+
+    linkList.innerHTML = blocks.join('');
+  }
+
+  function buildAdminGroup(id, title, items) {
+    return `
+      <div class="admin-group">
+        <div class="admin-group-head">
+          <span class="admin-group-name">${escapeHtml(title)}</span>
+          <span class="admin-group-count">${items.length}</span>
+        </div>
+        ${items.map(link => buildAdminItem(link)).join('')}
+      </div>`;
+  }
+
+  function buildAdminItem(link) {
+    /* 排序按位置算，用的是 links 里的真实下标而不是过滤后的下标 */
+    const index = links.findIndex(l => l.id === link.id);
+    const badge = PREVIEW_LABEL[link.preview] || null;
+    const host = D.hostOf(link.url);
+
+    return `
+      <div class="link-list-item" data-link-id="${escapeAttr(link.id)}">
+        <img class="item-favicon" alt="" loading="lazy"
+             src="${escapeAttr(CONFIG.faviconService + encodeURIComponent(host) + '&sz=32')}"
+             onerror="this.style.visibility='hidden'">
         <div class="item-info">
-          <div class="item-title">${escapeHtml(link.title)}</div>
+          <div class="item-title">
+            ${escapeHtml(link.title)}
+            ${badge ? `<span class="preview-tag ${badge.cls}">${badge.text}</span>` : ''}
+          </div>
           <div class="item-url">${escapeHtml(link.url)}</div>
         </div>
         <div class="item-actions">
-          <button class="btn icon-btn reorder-btn" onclick="moveLinkUp('${link.id}')" ${index === 0 ? 'disabled' : ''} title="上移">
+          <button class="btn icon-btn reorder-btn" onclick="moveLinkUp('${escapeAttr(link.id)}')" ${index === 0 ? 'disabled' : ''} title="上移">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
             </svg>
           </button>
-          <button class="btn icon-btn reorder-btn" onclick="moveLinkDown('${link.id}')" ${index === links.length - 1 ? 'disabled' : ''} title="下移">
+          <button class="btn icon-btn reorder-btn" onclick="moveLinkDown('${escapeAttr(link.id)}')" ${index === links.length - 1 ? 'disabled' : ''} title="下移">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
-          <button class="btn icon-btn" onclick="editLink('${link.id}')" title="编辑">
+          <button class="btn icon-btn" onclick="editLink('${escapeAttr(link.id)}')" title="编辑">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
             编辑
           </button>
-          <button class="btn btn-danger" onclick="deleteLink('${link.id}')" title="删除">
+          <button class="btn btn-danger" onclick="deleteLink('${escapeAttr(link.id)}')" title="删除">
             删除
           </button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+  }
+
+  if (adminSearch) adminSearch.addEventListener('input', renderLinkList);
+
+  /* ==================== 添加表单：favicon 预览 + 重复检测 ==================== */
+  if (urlInput) {
+    urlInput.addEventListener('input', function() {
+      const raw = urlInput.value.trim();
+      if (!raw) {
+        urlFavicon.hidden = true;
+        urlHint.hidden = true;
+        return;
+      }
+
+      const url = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+      const host = D.hostOf(url);
+
+      if (host && host.includes('.')) {
+        urlFavicon.src = CONFIG.faviconService + encodeURIComponent(host) + '&sz=32';
+        urlFavicon.hidden = false;
+      } else {
+        urlFavicon.hidden = true;
+      }
+
+      const dup = links.find(l => D.hostOf(l.url) === host);
+      if (dup) {
+        urlHint.textContent = `已存在同域名链接：${dup.title}`;
+        urlHint.className = 'field-hint warn';
+        urlHint.hidden = false;
+      } else {
+        urlHint.hidden = true;
+      }
+    });
   }
 
   /* ==================== 添加链接（顶部表单） ==================== */
@@ -208,6 +328,7 @@
     };
 
     links.push(newLink);
+    markDirty();
     linkForm.reset();
     renderLinkList();
     showToast('链接已添加（记得保存部署）', 'success');
@@ -252,7 +373,11 @@
 
     const idx = links.findIndex(l => l.id === editingId);
     if (idx !== -1) {
+      /* 改了 URL 就作废旧的预览判定，等保存时重新探测 */
+      const urlChanged = links[idx].url !== finalUrl;
       links[idx] = { ...links[idx], title, url: finalUrl, description: desc, category: cat };
+      if (urlChanged) delete links[idx].preview;
+      markDirty();
     }
 
     closeEditModal();
@@ -279,6 +404,7 @@
     const idx = links.findIndex(l => l.id === id);
     if (idx <= 0) return;
     [links[idx], links[idx - 1]] = [links[idx - 1], links[idx]];
+    markDirty();
     renderLinkList();
     scrollAndHighlight(id);
   };
@@ -287,6 +413,7 @@
     const idx = links.findIndex(l => l.id === id);
     if (idx >= links.length - 1) return;
     [links[idx], links[idx + 1]] = [links[idx + 1], links[idx]];
+    markDirty();
     renderLinkList();
     scrollAndHighlight(id);
   };
@@ -310,6 +437,7 @@
   window.deleteLink = function(id) {
     if (!confirm('确定要删除这个链接吗？')) return;
     links = links.filter(l => l.id !== id);
+    markDirty();
     renderLinkList();
     showToast('链接已删除（记得保存部署）', 'info');
   };
@@ -399,7 +527,9 @@
       const isOwned = owned.has(name);
       return `<li class="domain-sub ${isOwned ? 'is-owned' : ''}">
         <span class="domain-sub-name">${escapeHtml(name)}</span>
-        <span class="domain-sub-tag">${isOwned ? '已收录' : '未收录'}</span>
+        ${isOwned
+          ? '<span class="domain-sub-tag">已收录</span>'
+          : `<button class="domain-sub-add" type="button" data-host="${escapeAttr(name)}" title="填进上方的添加表单">+ 添加</button>`}
       </li>`;
     }).join('');
 
@@ -412,44 +542,75 @@
       </div>
       <ul class="domain-sub-list">${items}</ul>
     `;
+
+    /* 「+ 添加」把子域名填进上方表单并滚过去，剩下的标题/描述由人补 */
+    body.querySelectorAll('.domain-sub-add').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const host = btn.dataset.host;
+        document.getElementById('linkUrl').value = 'https://' + host;
+        document.getElementById('linkTitle').value = host.split('.')[0];
+        document.getElementById('linkUrl').dispatchEvent(new Event('input'));
+        linkForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.getElementById('linkTitle').focus();
+        showToast(`已填入 ${host}，补完标题后点「添加链接」`, 'info');
+      });
+    });
   }
 
   /* ==================== 保存并部署 ==================== */
-  window.saveAndDeploy = async function() {
+
+  let submitting = false;
+
+  /**
+   * 提交 links.json。两个入口共用：
+   *   saveAndDeploy()    —— 常规保存，服务端只探测新链接的预览方式
+   *   recheckPreviews()  —— 带 recheck，服务端把所有链接重新探测一遍
+   */
+  async function submitLinks({ recheck, busyBtn, startText, doneText, redirect }) {
+    if (submitting) return;
     if (!authToken) {
       showToast('登录状态已失效，请重新输入密码', 'error');
       return;
     }
 
+    submitting = true;
     deployBtn.disabled = true;
-    showDeployStatus('deploying', '正在提交链接数据...');
+    if (recheckBtn) recheckBtn.disabled = true;
+    busyBtn.classList.add('is-busy');
+    showDeployStatus('deploying', startText);
 
     try {
-      const updateRes = await fetch(CONFIG.API.deploy, {
+      const res = await fetch(CONFIG.API.deploy, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Admin-Auth': authToken
         },
-        body: JSON.stringify({ links })
+        body: JSON.stringify(recheck ? { links, recheck: true } : { links })
       });
 
-      if (!updateRes.ok) {
-        const errData = await updateRes.json().catch(() => ({}));
-        throw new Error(errData.error || `服务端返回 ${updateRes.status}`);
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `服务端返回 ${res.status}`);
 
-      /* Step 3: 等待部署 */
-      showDeployStatus('deploying', '提交成功！等待 CloudFlare 重新部署...');
+      /* 服务端会把补齐 preview 后的结果回传，同步进本地状态，
+         这样列表里的「可嵌入 / 截图 / 离线」角标立刻就是新的 */
+      if (Array.isArray(data.links)) {
+        links = data.links;
+        renderLinkList();
+      }
+      clearDirty();
+
+      const probedNote = data.probed ? `（探测了 ${data.probed} 个站点）` : '';
+      showDeployStatus('deploying', `${doneText}${probedNote}，等待 CloudFlare 重新部署...`);
       await sleep(CONFIG.deployWaitTime);
 
-      /* Step 4: 完成 */
-      showDeployStatus('success', '部署完成！正在跳转到首页...');
-      showToast('保存部署成功！', 'success');
+      showDeployStatus('success', redirect ? '部署完成！正在跳转到首页...' : '部署完成！');
+      showToast(doneText, 'success');
 
-      await sleep(2000);
-      window.location.href = 'index.html';
-
+      if (redirect) {
+        await sleep(1500);
+        window.location.href = 'index.html';
+      }
     } catch (err) {
       console.error('部署失败:', err);
       /* 服务端已返回中文原因，这里只兜底网络层异常 */
@@ -457,8 +618,31 @@
       showDeployStatus('error', '部署失败: ' + errMsg);
       showToast('部署失败: ' + errMsg, 'error');
     } finally {
+      submitting = false;
       deployBtn.disabled = false;
+      if (recheckBtn) recheckBtn.disabled = false;
+      busyBtn.classList.remove('is-busy');
     }
+  }
+
+  window.saveAndDeploy = function() {
+    return submitLinks({
+      recheck: false,
+      busyBtn: deployBtn,
+      startText: '正在提交链接数据...',
+      doneText: '保存成功',
+      redirect: true
+    });
+  };
+
+  window.recheckPreviews = function() {
+    return submitLinks({
+      recheck: true,
+      busyBtn: recheckBtn,
+      startText: '正在逐个探测站点能否嵌入预览，可能需要十几秒...',
+      doneText: '预览检测完成',
+      redirect: false
+    });
   };
 
   /* ==================== 部署状态显示 ==================== */
@@ -504,6 +688,10 @@
   }
 
   /* ==================== 工具函数 ==================== */
+  function escapeAttr(str) {
+    return escapeHtml(str).replace(/"/g, '&quot;');
+  }
+
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str || '';

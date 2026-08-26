@@ -20,6 +20,17 @@ const DEFAULTS = {
 
 const MAX_LINKS = 2000;
 
+/* 预览可嵌入性探测。结果写进 links.json 的 preview 字段，前端据此选渲染方式：
+     frame   → 可以嵌 iframe，实时预览
+     shot    → 站点拒绝被嵌（X-Frame-Options / frame-ancestors），改用截图服务
+     offline → 请求不通，降级成品牌卡
+   常规保存只探测还没有结论的链接；后台「重新检测预览」会带 recheck 全量重跑。 */
+const PREVIEW_MODES = ['frame', 'shot', 'offline'];
+const DEFAULT_PREVIEW = 'frame';
+const PROBE_TIMEOUT_MS = 8000;
+const PROBE_CONCURRENCY = 6;
+const MAX_PROBES = 45;   // 留出 Worker 子请求余量（GitHub 那两次也要算）
+
 /* 子域名探测：证书透明度日志查询慢且常抽风，结果缓存 6 小时 */
 const CT_TIMEOUT_MS = 20000;
 const SUBDOMAIN_CACHE_SECONDS = 6 * 3600;
@@ -100,12 +111,86 @@ function sanitizeLinks(input) {
         const description = String(item.description ?? '').slice(0, 500);
         const category = String(item.category ?? '').slice(0, 100);
 
+        /* preview 只接受三个已知值；其它一律置空，交给后面的探测补齐 */
+        const rawPreview = String(item.preview ?? '');
+        const preview = PREVIEW_MODES.includes(rawPreview) ? rawPreview : '';
+
         if (!id || !title || !url) return { error: '链接项缺少 id / title / url' };
         if (!/^https?:\/\//i.test(url)) return { error: `URL 协议不合法：${url.slice(0, 60)}` };
 
-        out.push({ id, title, url, description, category });
+        out.push({ id, title, url, description, category, preview });
     }
     return { links: out };
+}
+
+/* ==================== 预览可嵌入性探测 ==================== */
+
+/**
+ * 判断一个站点能不能被 iframe 嵌入。
+ * 只看响应头，不下载正文：先 HEAD，遇到不支持 HEAD 的服务器再退回 GET。
+ */
+async function probePreview(url) {
+    const opts = {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        headers: {
+            /* 有些站点对无 UA 的请求直接拒绝，探测结果会失真 */
+            'User-Agent': 'Mozilla/5.0 (compatible; CaptainLink/1.0; +https://tianzeqi.link)'
+        }
+    };
+
+    let resp;
+    try {
+        resp = await fetch(url, { ...opts, method: 'HEAD' });
+        if (resp.status === 405 || resp.status === 501) {
+            resp = await fetch(url, { ...opts, method: 'GET' });
+        }
+    } catch {
+        return 'offline';
+    }
+
+    if (resp.status >= 400) return 'offline';
+
+    const xfo = (resp.headers.get('x-frame-options') || '').toLowerCase();
+    if (xfo.includes('deny') || xfo.includes('sameorigin') || xfo.includes('allow-from')) {
+        return 'shot';
+    }
+
+    const csp = (resp.headers.get('content-security-policy') || '').toLowerCase();
+    const fa = csp.match(/frame-ancestors\s+([^;]+)/);
+    if (fa) {
+        const value = fa[1].trim();
+        /* 只有明确放行任意来源（*）才算可嵌入 */
+        if (!value.includes('*')) return 'shot';
+    }
+
+    return 'frame';
+}
+
+/**
+ * 批量探测，并发有上限。返回 url → mode 的映射。
+ * 单条失败不影响其余；整体异常由调用方兜底。
+ */
+async function probeAll(urls) {
+    const list = urls.slice(0, MAX_PROBES);
+    const result = new Map();
+    let cursor = 0;
+
+    async function worker() {
+        while (cursor < list.length) {
+            const url = list[cursor++];
+            try {
+                result.set(url, await probePreview(url));
+            } catch {
+                /* 留空 → 调用方保留原值 */
+            }
+        }
+    }
+
+    await Promise.all(
+        Array.from({ length: Math.min(PROBE_CONCURRENCY, list.length) }, worker)
+    );
+    return result;
 }
 
 /** 取末两段作为一级域名，与前端 hostname.split('.').length <= 2 的判断保持一致 */
@@ -271,6 +356,29 @@ async function handleDeploy(request, env) {
     const result = sanitizeLinks(body && body.links);
     if (result.error) return json({ error: result.error }, 400);
 
+    /* 补齐 preview：常规保存只探测还没结论的新链接，recheck 时全量重跑。
+       探测本身不影响保存 —— 出任何问题都保留原值继续提交。 */
+    const recheck = body && body.recheck === true;
+    const pending = result.links
+        .filter(link => recheck || !link.preview)
+        .map(link => link.url);
+
+    let probed = 0;
+    if (pending.length) {
+        try {
+            const modes = await probeAll([...new Set(pending)]);
+            result.links.forEach(link => {
+                const mode = modes.get(link.url);
+                if (mode) { link.preview = mode; probed++; }
+            });
+        } catch { /* 探测整体失败：保留原值，照常部署 */ }
+    }
+
+    /* 仍然没有结论的（探测失败 / 超出条数上限）落到默认值 */
+    result.links.forEach(link => {
+        if (!link.preview) link.preview = DEFAULT_PREVIEW;
+    });
+
     const content = JSON.stringify({ links: result.links }, null, 2);
 
     const owner = env.GH_OWNER || DEFAULTS.owner;
@@ -328,7 +436,13 @@ async function handleDeploy(request, env) {
     }
 
     const out = await putResp.json().catch(() => ({}));
-    return json({ ok: true, count: result.links.length, commit: out.commit && out.commit.sha });
+    return json({
+        ok: true,
+        count: result.links.length,
+        probed,
+        links: result.links,          /* 回传给后台，好把 preview 结果同步进本地状态 */
+        commit: out.commit && out.commit.sha
+    });
 }
 
 /* ==================== 入口 ==================== */

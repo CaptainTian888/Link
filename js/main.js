@@ -376,7 +376,18 @@
     collapsed.delete(chip.dataset.target.replace(/^group-/, ''));
     /* 这是我们自己发起的滚动，先给滚动防护放行，免得被当成异常滚动拉回去 */
     allowProgrammaticScroll(1500);
+
+    const before = window.scrollY;
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    /* 少数环境（自动化浏览器、关掉平滑滚动的设置）会直接忽略 behavior:'smooth'，
+       表现成点了没反应。给一拍时间，没动就退回瞬时滚动。 */
+    setTimeout(function() {
+      if (Math.abs(window.scrollY - before) < 2) {
+        allowProgrammaticScroll(800);
+        target.scrollIntoView({ block: 'start' });
+      }
+    }, 250);
   });
 
   toggleBtns.forEach(function(btn) {

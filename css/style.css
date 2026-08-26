@@ -25,6 +25,9 @@
   --transition:     all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --font-heading:   'Outfit', system-ui, sans-serif;
   --font-body:      'Inter', system-ui, -apple-system, sans-serif;
+
+  /* 导航栏高度：吸顶工具条要贴在它下面，分组锚点跳转也要避开它 */
+  --nav-h: 80px;
 }
 
 /* ==================== Reset ==================== */
@@ -193,7 +196,8 @@ input, textarea { font-family: inherit; outline: none; }
 /* ==================== 吸顶工具条 ==================== */
 .toolbar {
   position: sticky;
-  top: 0;
+  /* 贴在 sticky 导航栏下沿，否则会被 z-index 更高的导航栏盖掉 */
+  top: var(--nav-h);
   z-index: 40;
   margin-bottom: 28px;
   padding: 12px 24px 0;
@@ -460,7 +464,7 @@ input, textarea { font-family: inherit; outline: none; }
   overflow-anchor: none;
 }
 
-.link-group { scroll-margin-top: 120px; }
+.link-group { scroll-margin-top: calc(var(--nav-h) + 120px); }
 
 .group-header {
   display: flex;
@@ -1618,6 +1622,8 @@ input, textarea { font-family: inherit; outline: none; }
 
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
+  :root { --nav-h: 64px; }
+
   .navbar { padding: 16px 20px; }
   .navbar .logo { font-size: 18px; }
   .navbar .logo img { width: 32px; height: 32px; }

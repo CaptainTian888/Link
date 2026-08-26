@@ -51,6 +51,12 @@
     addEventListener(type, function() { lastGestureAt = performance.now(); }, { passive: true, capture: true });
   });
 
+  /* 浏览器的「页内查找」会滚动页面但不给页面发任何输入事件，只会改动选区。
+     把选区变化也算成用户意图，Ctrl+F 才不会被下面的防护拉回去。 */
+  document.addEventListener('selectionchange', function() {
+    lastGestureAt = performance.now();
+  }, { passive: true });
+
   /** 放行一次自家发起的滚动 */
   function allowProgrammaticScroll(ms) {
     allowUntil = performance.now() + (ms || 1200);
@@ -59,7 +65,6 @@
   /* 焦点被预览抢走后如果不夺回来，方向键 / 空格 / PageDown 都会打进 iframe，
      外层页面就滚不动了。收不到 focusin，只能定期查一眼 activeElement。 */
   function releaseStolenFocus() {
-    if (typeof document.hasFocus === 'function' && !document.hasFocus()) return;
     const active = document.activeElement;
     if (active && active.tagName === 'IFRAME' && active.closest('.link-preview')) {
       if (typeof active.blur === 'function') active.blur();
@@ -77,11 +82,11 @@
     const userDriven = now - lastGestureAt < GESTURE_WINDOW_MS;
     const ourOwn = now < allowUntil;
     const booting = now - bootAt < BOOT_GRACE_MS;
-    /* 浏览器 UI（查找栏、开发者工具）拿着焦点时，滚动多半是「在页面内查找」
-       之类的正常行为，不要拦 */
-    const uiFocused = typeof document.hasFocus === 'function' && !document.hasFocus();
 
-    if (userDriven || ourOwn || booting || uiFocused) {
+    /* 这里刻意不拿 document.hasFocus() 当豁免条件：窗口失焦时它是 false，
+       而「切走再切回来发现页面自己滚了一大段」恰恰是要治的症状 —— 豁免掉
+       等于在最需要防护的时候把防护关了。查找栏由上面的 selectionchange 覆盖。 */
+    if (userDriven || ourOwn || booting) {
       lastGoodY = y;
       return;
     }

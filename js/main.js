@@ -25,6 +25,58 @@
   const searchInput = document.getElementById('searchInput');
   const toggleBtns = document.querySelectorAll('.toggle-btn');
 
+  /* ==================== 滚动防护 ==================== */
+  /*
+   * 「没操作也会自己上下滚」的根源：预览里的站点会调用 focus()（自动聚焦搜索框、
+   * 登录框等）。焦点一旦落进 iframe，浏览器为了把焦点元素露出来就会滚动外层页面。
+   * inert 和 tabindex="-1" 只能挡住 Tab 键顺序聚焦，挡不住跨文档的程序化聚焦 ——
+   * 实测 document.activeElement 确实变成了预览 iframe。
+   *
+   * 这里的做法是：记一份滚动位置的短历史 + 最后一次用户手势的时间；
+   * 一旦发现焦点跑进预览，就立刻夺回焦点，并把页面滚回被拽走之前的位置。
+   * 只在「近期没有用户手势」时才回滚，所以不会和正常的滚轮操作打架。
+   */
+  const GESTURE_WINDOW_MS = 400;
+  let lastGestureAt = 0;
+  let restoring = false;
+  const scrollLog = [];
+
+  ['wheel', 'touchstart', 'touchmove', 'keydown', 'mousedown', 'pointerdown'].forEach(function(type) {
+    addEventListener(type, function() { lastGestureAt = performance.now(); }, { passive: true, capture: true });
+  });
+
+  addEventListener('scroll', function() {
+    if (restoring) return;
+    scrollLog.push({ t: performance.now(), y: window.scrollY });
+    if (scrollLog.length > 60) scrollLog.shift();
+  }, { passive: true });
+
+  /** 取 ms 毫秒之前的滚动位置 */
+  function scrollYBefore(ms) {
+    const cutoff = performance.now() - ms;
+    for (let i = scrollLog.length - 1; i >= 0; i--) {
+      if (scrollLog[i].t <= cutoff) return scrollLog[i].y;
+    }
+    return scrollLog.length ? scrollLog[0].y : window.scrollY;
+  }
+
+  document.addEventListener('focusin', function(e) {
+    const el = e.target;
+    if (!el || el.tagName !== 'IFRAME' || !el.closest('.link-preview')) return;
+
+    const userDriven = performance.now() - lastGestureAt < GESTURE_WINDOW_MS;
+    const target = scrollYBefore(300);
+
+    /* 把焦点还给文档本身，别留在预览里 */
+    if (typeof el.blur === 'function') el.blur();
+
+    if (!userDriven && Math.abs(window.scrollY - target) > 2) {
+      restoring = true;
+      window.scrollTo({ top: target, behavior: 'auto' });
+      requestAnimationFrame(function() { restoring = false; });
+    }
+  }, true);
+
   /* ==================== 懒加载观察器 ==================== */
 
   const lazyObserver = new IntersectionObserver(function(entries) {
@@ -79,9 +131,22 @@
 
   /* ==================== 预览区渲染 ==================== */
 
+  /* 同源链接绝不能用 iframe：本站自己也在链接列表里，嵌进来就是页面套页面，
+     嵌套副本会再跑一遍 main.js、再拉一批 iframe，还会把滚动和焦点搅乱。
+     这类链接一律走截图。 */
+  function isSameOrigin(url) {
+    try {
+      return new URL(url, location.href).origin === location.origin;
+    } catch {
+      return false;
+    }
+  }
+
   function buildPreview(link) {
-    const mode = link.preview || 'frame';
+    let mode = link.preview || 'frame';
     const host = D.hostOf(link.url);
+
+    if (mode === 'frame' && isSameOrigin(link.url)) mode = 'shot';
 
     if (mode === 'shot') {
       const shot = CONFIG.previewService + link.url;

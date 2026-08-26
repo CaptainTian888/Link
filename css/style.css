@@ -37,7 +37,14 @@
   box-sizing: border-box;
 }
 
-html { scroll-behavior: smooth; }
+/* 不设全局 scroll-behavior: smooth —— 它会把任何一次程序化滚动都变成一段
+   缓慢的动画，看起来就像页面在「自己上下滚」。需要平滑滚动的地方
+   （分组跳转）在 JS 里显式传 behavior:'smooth'。 */
+html { scroll-behavior: auto; }
+
+/* 关掉滚动锚定。图片 / iframe 陆续加载时，浏览器会为了「保持锚点元素位置」
+   主动挪动视口，这也是无操作自动滚动的来源之一。 */
+html, body { overflow-anchor: none; }
 
 body {
   font-family: var(--font-body);

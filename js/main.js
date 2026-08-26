@@ -56,6 +56,18 @@
     allowUntil = performance.now() + (ms || 1200);
   }
 
+  /* 焦点被预览抢走后如果不夺回来，方向键 / 空格 / PageDown 都会打进 iframe，
+     外层页面就滚不动了。收不到 focusin，只能定期查一眼 activeElement。 */
+  function releaseStolenFocus() {
+    if (typeof document.hasFocus === 'function' && !document.hasFocus()) return;
+    const active = document.activeElement;
+    if (active && active.tagName === 'IFRAME' && active.closest('.link-preview')) {
+      if (typeof active.blur === 'function') active.blur();
+    }
+  }
+
+  setInterval(releaseStolenFocus, 500);
+
   addEventListener('scroll', function() {
     if (restoring) return;
 

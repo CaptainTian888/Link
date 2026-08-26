@@ -87,6 +87,9 @@
        而「切走再切回来发现页面自己滚了一大段」恰恰是要治的症状 —— 豁免掉
        等于在最需要防护的时候把防护关了。查找栏由上面的 selectionchange 覆盖。 */
     if (userDriven || ourOwn || booting) {
+      /* 平滑滚动是一连串 scroll 事件，跨度可能好几秒。只要动画还在推进就
+         顺延放行窗口，否则长距离跳转会在半途被下面的回滚逻辑拽回去。 */
+      if (ourOwn) allowUntil = now + 400;
       lastGoodY = y;
       return;
     }
